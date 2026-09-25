@@ -1,0 +1,15 @@
+# Browser profile and cache folders
+edge_debug_prof/
+edge_tmp_profile/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
