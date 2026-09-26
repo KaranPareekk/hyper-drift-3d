@@ -58,7 +58,31 @@ export class HUD {
             });
         }
 
+        this.hudScreen = document.getElementById('hudScreen');
         this.bannerTimeout = null;
+
+        // Split-Screen Elements
+        this.p1Pos = document.getElementById('p1Pos');
+        this.p1Lap = document.getElementById('p1Lap');
+        this.p1Speed = document.getElementById('p1Speed');
+        this.p1Gear = document.getElementById('p1Gear');
+        this.p1NitroBar = document.getElementById('p1NitroBar');
+
+        this.p2Pos = document.getElementById('p2Pos');
+        this.p2Lap = document.getElementById('p2Lap');
+        this.p2Speed = document.getElementById('p2Speed');
+        this.p2Gear = document.getElementById('p2Gear');
+        this.p2NitroBar = document.getElementById('p2NitroBar');
+    }
+
+    setSplitScreenMode(enabled) {
+        if (this.hudScreen) {
+            if (enabled) {
+                this.hudScreen.classList.add('split-mode');
+            } else {
+                this.hudScreen.classList.remove('split-mode');
+            }
+        }
     }
 
     update(physics, opponents = [], track = null) {
@@ -238,6 +262,46 @@ export class HUD {
         this.bannerTimeout = setTimeout(() => {
             this.banner.classList.remove('visible');
         }, duration);
+    }
+
+    updateSplit(p1Physics, p2Physics, track = null) {
+        if (!p1Physics || !p2Physics) return;
+
+        // --- Player 1 Telemetry ---
+        const speed1 = p1Physics.getSpeedKmh();
+        if (this.p1Speed) this.p1Speed.innerText = speed1;
+        if (this.p1Gear) this.p1Gear.innerText = p1Physics.gear;
+        if (this.p1Lap) this.p1Lap.innerText = `${Math.min(3, p1Physics.currentLap)}/3`;
+        if (this.p1NitroBar) {
+            this.p1NitroBar.style.width = `${p1Physics.nitro}%`;
+        }
+
+        // --- Player 2 Telemetry ---
+        const speed2 = p2Physics.getSpeedKmh();
+        if (this.p2Speed) this.p2Speed.innerText = speed2;
+        if (this.p2Gear) this.p2Gear.innerText = p2Physics.gear;
+        if (this.p2Lap) this.p2Lap.innerText = `${Math.min(3, p2Physics.currentLap)}/3`;
+        if (this.p2NitroBar) {
+            this.p2NitroBar.style.width = `${p2Physics.nitro}%`;
+        }
+
+        // Calculate dynamic relative race ranking
+        if (this.p1Pos && this.p2Pos && track) {
+            const p1Prog = (p1Physics.currentLap - 1) + p1Physics.checkpointProgress;
+            const p2Prog = (p2Physics.currentLap - 1) + p2Physics.checkpointProgress;
+
+            if (p1Prog >= p2Prog) {
+                this.p1Pos.innerText = "1ST";
+                this.p1Pos.style.color = "#00f0ff";
+                this.p2Pos.innerText = "2ND";
+                this.p2Pos.style.color = "#ff88aa";
+            } else {
+                this.p1Pos.innerText = "2ND";
+                this.p1Pos.style.color = "#8fa0c0";
+                this.p2Pos.innerText = "1ST";
+                this.p2Pos.style.color = "#ff0055";
+            }
+        }
     }
 
     formatTime(sec) {

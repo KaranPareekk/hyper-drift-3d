@@ -17,6 +17,7 @@ export class LobbyUI {
 
         // Game mode buttons
         this.btnStartSolo = document.getElementById('btnStartSolo');
+        this.btnStartSplit = document.getElementById('btnStartSplit');
         this.btnCreateRoom = document.getElementById('btnCreateRoom');
         this.btnJoinRoom = document.getElementById('btnJoinRoom');
         this.roomCodeInput = document.getElementById('roomCodeInput');
@@ -83,6 +84,15 @@ export class LobbyUI {
         if (this.btnStartSolo) {
             this.btnStartSolo.addEventListener('click', () => {
                 this.startGame(false);
+            });
+        }
+
+        // 2-Player Local Split-Screen Race
+        if (this.btnStartSplit) {
+            this.btnStartSplit.addEventListener('click', () => {
+                if (this.menuScreen) this.menuScreen.style.display = 'none';
+                if (this.hudScreen) this.hudScreen.style.display = 'block';
+                this.game.startSplitScreenRace();
             });
         }
 
