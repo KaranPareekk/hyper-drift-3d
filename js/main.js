@@ -207,7 +207,8 @@ class Game {
             }
         }
 
-        // Blur any focused input elements to prevent keyboard shortcuts or typing interference
+        // Clear stale inputs and blur any focused text inputs
+        this.clearInputs();
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();
         }
@@ -284,7 +285,8 @@ class Game {
         // 1v1 Local Split-Screen duel (no AI rivals)
         this.aiRivals = [];
 
-        // Focus window
+        // Clear stale inputs and focus window
+        this.clearInputs();
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();
         }
@@ -315,10 +317,40 @@ class Game {
         }, 1000);
     }
 
+    clearInputs() {
+        this.keys = {};
+        this.touchSteerLeft = false;
+        this.touchSteerRight = false;
+        if (this.btnTouchLeft) this.btnTouchLeft.classList.remove('active');
+        if (this.btnTouchRight) this.btnTouchRight.classList.remove('active');
+        if (this.playerPhysics) {
+            this.playerPhysics.input.left = 0;
+            this.playerPhysics.input.right = 0;
+            this.playerPhysics.input.forward = 0;
+            this.playerPhysics.input.backward = 0;
+            this.playerPhysics.input.nitro = false;
+            this.playerPhysics.input.handbrake = false;
+        }
+        if (this.player2Physics) {
+            this.player2Physics.input.left = 0;
+            this.player2Physics.input.right = 0;
+            this.player2Physics.input.forward = 0;
+            this.player2Physics.input.backward = 0;
+            this.player2Physics.input.nitro = false;
+            this.player2Physics.input.handbrake = false;
+        }
+    }
+
     setupInputs() {
         const handleKeyDown = (e) => {
-            // Prevent gameplay keys from triggering browser scrolling, buttons, or navigation
-            const code = e.code;
+            // Do not capture gameplay inputs if the user is typing in a lobby text box
+            const isTyping = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+            if (isTyping && this.gameState === 'LOBBY') {
+                return;
+            }
+
+            // Prevent gameplay keys from triggering browser scrolling or navigation
+            const code = e.code || '';
             const key = e.key ? e.key.toLowerCase() : '';
             if (code === 'Space' || key === ' ' || 
                 code === 'ArrowUp' || code === 'ArrowDown' || 
@@ -341,12 +373,20 @@ class Game {
                 this.keys[e.key.toUpperCase()] = true;
                 this.keys[e.key] = true;
             }
+            if (e.keyCode) {
+                this.keys[e.keyCode] = true;
+                this.keys['keyCode_' + e.keyCode] = true;
+            }
+            if (e.which) {
+                this.keys[e.which] = true;
+                this.keys['which_' + e.which] = true;
+            }
 
             // Reset car keys ('R' for P1, 'P' for P2 in split-screen)
-            if ((e.code === 'KeyR' || key === 'r') && this.gameState === 'RACING') {
+            if ((code === 'KeyR' || key === 'r' || e.keyCode === 82) && this.gameState === 'RACING') {
                 this.resetPlayerToTrack();
             }
-            if ((e.code === 'KeyP' || key === 'p') && this.isSplitScreen && this.gameState === 'RACING') {
+            if ((code === 'KeyP' || key === 'p' || e.keyCode === 80) && this.isSplitScreen && this.gameState === 'RACING') {
                 this.resetPlayer2ToTrack();
             }
 
@@ -363,6 +403,14 @@ class Game {
                 this.keys[e.key.toUpperCase()] = false;
                 this.keys[e.key] = false;
             }
+            if (e.keyCode) {
+                this.keys[e.keyCode] = false;
+                this.keys['keyCode_' + e.keyCode] = false;
+            }
+            if (e.which) {
+                this.keys[e.which] = false;
+                this.keys['which_' + e.which] = false;
+            }
 
             // Turbo flutter sound when releasing throttle at high RPM
             if ((e.code === 'KeyW' || e.key === 'w' || e.key === 'W' || e.code === 'ArrowUp') && 
@@ -371,12 +419,12 @@ class Game {
             }
         };
 
-        // Attach listeners to both window and document to ensure keys are never missed
+        // Attach listeners cleanly to window
         window.addEventListener('keydown', handleKeyDown, { passive: false });
-        document.addEventListener('keydown', handleKeyDown, { passive: false });
-
         window.addEventListener('keyup', handleKeyUp, { passive: false });
-        document.addEventListener('keyup', handleKeyUp, { passive: false });
+
+        // Wipe inputs on window blur to prevent keys getting stuck
+        window.addEventListener('blur', () => this.clearInputs());
 
         // Wire On-Screen Side Control Buttons (Mouse & Touch & Stylus)
         const setupSideButton = (btn, onStart, onEnd) => {
@@ -412,21 +460,19 @@ class Game {
         this.btnTouchRight = document.getElementById('btnTouchRight');
 
         setupSideButton(this.btnTouchLeft, 
-            () => { this.touchSteerLeft = true; }, 
+            () => { this.touchSteerLeft = true; this.touchSteerRight = false; }, 
             () => { this.touchSteerLeft = false; }
         );
 
         setupSideButton(this.btnTouchRight, 
-            () => { this.touchSteerRight = true; }, 
+            () => { this.touchSteerRight = true; this.touchSteerLeft = false; }, 
             () => { this.touchSteerRight = false; }
         );
 
-        // Visibility change: only wipe keys when tab is truly hidden to prevent dropouts
+        // Visibility change: clear keys when tab is hidden
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                this.keys = {};
-                this.touchSteerLeft = false;
-                this.touchSteerRight = false;
+                this.clearInputs();
             }
         });
 
@@ -446,29 +492,31 @@ class Game {
             if (!this.isSplitScreen) {
                 // --- SINGLE PLAYER / ONLINE MULTIPLAYER (Full multi-layout support) ---
                 const isW = Boolean(
-                    this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || 
-                    this.keys['Enter'] || this.keys['NumpadEnter'] || this.keys['enter'] ||
-                    this.keys['ArrowUp'] || this.keys['Up'] || this.keys['Numpad8']
+                    this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || this.keys[87] || this.keys['keyCode_87'] ||
+                    this.keys['Enter'] || this.keys['NumpadEnter'] || this.keys['enter'] || this.keys[13] || this.keys['keyCode_13'] ||
+                    this.keys['ArrowUp'] || this.keys['Up'] || this.keys[38] || this.keys['keyCode_38'] ||
+                    this.keys['Numpad8']
                 );
                 const isS = Boolean(
-                    this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || 
-                    this.keys['ArrowDown'] || this.keys['Down'] || this.keys['Numpad2'] || this.keys['Numpad5']
+                    this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || this.keys[83] || this.keys['keyCode_83'] ||
+                    this.keys['ArrowDown'] || this.keys['Down'] || this.keys[40] || this.keys['keyCode_40'] ||
+                    this.keys['Numpad2'] || this.keys['Numpad5']
                 );
                 const isA = Boolean(
-                    this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || 
-                    this.keys['ArrowLeft'] || this.keys['Left'] || 
-                    this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || 
+                    this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys[65] || this.keys['keyCode_65'] ||
+                    this.keys['ArrowLeft'] || this.keys['Left'] || this.keys[37] || this.keys['keyCode_37'] ||
+                    this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || this.keys[81] || this.keys['keyCode_81'] ||
                     this.keys['Numpad4'] || this.touchSteerLeft
                 );
                 const isD = Boolean(
-                    this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || 
-                    this.keys['ArrowRight'] || this.keys['Right'] || 
+                    this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || this.keys[68] || this.keys['keyCode_68'] ||
+                    this.keys['ArrowRight'] || this.keys['Right'] || this.keys[39] || this.keys['keyCode_39'] ||
                     this.keys['Numpad6'] || this.touchSteerRight
                 );
                 const isBoost = Boolean(
-                    this.keys['Space'] || this.keys[' '] ||
-                    this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] ||
-                    this.keys['KeyE'] || this.keys['e'] || this.keys['E']
+                    this.keys['Space'] || this.keys[' '] || this.keys[32] || this.keys['keyCode_32'] ||
+                    this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || this.keys[16] || this.keys['keyCode_16'] ||
+                    this.keys['KeyE'] || this.keys['e'] || this.keys['E'] || this.keys[69] || this.keys['keyCode_69']
                 );
 
                 this.playerPhysics.input.forward = isW ? 1 : 0;
@@ -490,14 +538,24 @@ class Game {
             } else {
                 // --- 2-PLAYER LOCAL SPLIT-SCREEN (Strictly Decoupled) ---
                 // PLAYER 1 (Left Screen): WASD for steering/reverse + ENTER for acceleration
-                const p1SteerLeft = Boolean(this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys['KeyQ'] || this.keys['q']);
-                const p1SteerRight = Boolean(this.keys['KeyD'] || this.keys['d'] || this.keys['D']);
-                const p1Reverse = Boolean(this.keys['KeyS'] || this.keys['s'] || this.keys['S']);
-                const p1Accelerate = Boolean(
-                    this.keys['Enter'] || this.keys['enter'] || this.keys['NumpadEnter'] || 
-                    this.keys['KeyW'] || this.keys['w'] || this.keys['W']
+                const p1SteerLeft = Boolean(
+                    this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys[65] || this.keys['keyCode_65'] ||
+                    this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || this.keys[81] || this.keys['keyCode_81']
                 );
-                const p1Boost = Boolean(this.keys['KeyE'] || this.keys['e'] || this.keys['Space'] || this.keys[' ']);
+                const p1SteerRight = Boolean(
+                    this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || this.keys[68] || this.keys['keyCode_68']
+                );
+                const p1Reverse = Boolean(
+                    this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || this.keys[83] || this.keys['keyCode_83']
+                );
+                const p1Accelerate = Boolean(
+                    this.keys['Enter'] || this.keys['enter'] || this.keys['NumpadEnter'] || this.keys[13] || this.keys['keyCode_13'] ||
+                    this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || this.keys[87] || this.keys['keyCode_87']
+                );
+                const p1Boost = Boolean(
+                    this.keys['KeyE'] || this.keys['e'] || this.keys['E'] || this.keys[69] || this.keys['keyCode_69'] ||
+                    this.keys['Space'] || this.keys[' '] || this.keys[32] || this.keys['keyCode_32']
+                );
 
                 this.playerPhysics.input.forward = p1Accelerate ? 1 : 0;
                 this.playerPhysics.input.backward = p1Reverse ? 1 : 0;
@@ -508,15 +566,21 @@ class Game {
 
                 // PLAYER 2 (Right Screen): Arrow keys for steering/reverse + SHIFT for acceleration
                 if (this.player2Physics) {
-                    const p2SteerLeft = Boolean(this.keys['ArrowLeft'] || this.keys['Left']);
-                    const p2SteerRight = Boolean(this.keys['ArrowRight'] || this.keys['Right']);
-                    const p2Reverse = Boolean(this.keys['ArrowDown'] || this.keys['Down']);
+                    const p2SteerLeft = Boolean(
+                        this.keys['ArrowLeft'] || this.keys['Left'] || this.keys[37] || this.keys['keyCode_37']
+                    );
+                    const p2SteerRight = Boolean(
+                        this.keys['ArrowRight'] || this.keys['Right'] || this.keys[39] || this.keys['keyCode_39']
+                    );
+                    const p2Reverse = Boolean(
+                        this.keys['ArrowDown'] || this.keys['Down'] || this.keys[40] || this.keys['keyCode_40']
+                    );
                     const p2Accelerate = Boolean(
-                        this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || 
-                        this.keys['ArrowUp'] || this.keys['Up']
+                        this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || this.keys[16] || this.keys['keyCode_16'] ||
+                        this.keys['ArrowUp'] || this.keys['Up'] || this.keys[38] || this.keys['keyCode_38']
                     );
                     const p2Boost = Boolean(
-                        this.keys['Numpad0'] || this.keys['ControlRight'] || this.keys['ControlLeft']
+                        this.keys['Numpad0'] || this.keys[96] || this.keys['ControlRight'] || this.keys['ControlLeft'] || this.keys[17]
                     );
 
                     this.player2Physics.input.forward = p2Accelerate ? 1 : 0;

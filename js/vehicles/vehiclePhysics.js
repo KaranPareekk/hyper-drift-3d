@@ -145,18 +145,18 @@ export class VehiclePhysics {
     processInputs(dt) {
         const speedKmh = Math.abs(this.vLong * 3.6);
 
-        // Speed-dependent steering limit with high-speed aerodynamic stabilization:
-        // Tighter, precision racing envelope scaled by player's sensitivity preference
-        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 85.0, 1.3));
+        // Progressive, responsive steering lock: 0.44 rad (~25.2 deg) at low speeds down to 0.16 rad at top speed
+        // Scaled by player's sensitivity preference
+        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 75.0, 1.25));
         const sens = this.steeringSensitivity || 1.0;
-        const maxSteer = THREE.MathUtils.lerp(0.13, 0.29, speedFactor) * sens;
+        const maxSteer = THREE.MathUtils.lerp(0.16, 0.44, speedFactor) * sens;
 
-        const rawSteerInput = (this.input.left - this.input.right); // positive = left turn
+        const rawSteerInput = (this.input.left - this.input.right); // positive = left turn, negative = right turn
         const targetSteer = rawSteerInput * maxSteer;
 
         // Fast, crisp steering transition rate with snappy self-centering
         const isCounterSteer = (this.vLat * rawSteerInput < -0.1);
-        const steerSpeed = (rawSteerInput === 0 ? 17.0 : (isCounterSteer ? 22.0 : 14.0)) * THREE.MathUtils.clamp(sens, 0.8, 1.4);
+        const steerSpeed = (rawSteerInput === 0 ? 18.0 : (isCounterSteer ? 24.0 : 16.0)) * THREE.MathUtils.clamp(sens, 0.8, 1.4);
         this.steerAngle += (targetSteer - this.steerAngle) * Math.min(1.0, steerSpeed * dt);
 
         // Spacebar = BOOST (Nitro). Spacebar NEVER activates brakes or handbrake!
@@ -285,11 +285,11 @@ export class VehiclePhysics {
         this.vLat += aLat * dt;
 
         // Direct low-speed kinematic turning authority:
-        // Controlled, subtle pivoting without over-rotating
+        // Responsive pivoting without sudden jerks, providing immediate steering feedback
         const rawSteerInput = (this.input.left - this.input.right);
-        if (absSpeed < 12.0 && Math.abs(rawSteerInput) > 0.05) {
-            const lowSpeedPivot = rawSteerInput * (0.65 * (1.0 - absSpeed / 12.0) + (absSpeed / 12.0) * 0.45);
-            this.yawRate = THREE.MathUtils.lerp(this.yawRate, lowSpeedPivot, 0.16);
+        if (absSpeed < 14.0 && Math.abs(rawSteerInput) > 0.05) {
+            const lowSpeedPivot = rawSteerInput * (1.10 * (1.0 - absSpeed / 14.0) + (absSpeed / 14.0) * 0.70);
+            this.yawRate = THREE.MathUtils.lerp(this.yawRate, lowSpeedPivot, 0.22);
         } else {
             this.yawRate += yawAccel * dt;
         }
@@ -457,22 +457,13 @@ export class VehiclePhysics {
             // If in reverse (vLong < 0) or braking (input.backward > 0), DO NOT clamp or alter forward momentum!
             // Reverse is completely uninhibited so the player can effortlessly back up and pull away.
 
-            // Natural glance heading deflection:
-            // Only rotate heading if the car's nose is currently pointing INTO the wall!
-            // Right wall (sign = +1): pointed into wall when carHeadingAngle < 0.
-            // Left wall (sign = -1): pointed into wall when carHeadingAngle > 0.
-            if (sign * this.carHeadingAngle < 0) {
-                // Subtle glance angle inward toward the circuit
-                const targetHeading = sign * THREE.MathUtils.lerp(0.02, 0.07, severity);
-                this.carHeadingAngle = THREE.MathUtils.lerp(this.carHeadingAngle, targetHeading, 0.20);
-                this.yawRate = sign * THREE.MathUtils.lerp(0.5, 1.2, severity);
-            }
-
-            // Dampen front wheels ONLY if the player is turning deeper INTO the wall
-            if (sign > 0 && this.steerAngle < -0.05 && this.input.left === 0) {
-                this.steerAngle *= 0.3;
-            } else if (sign < 0 && this.steerAngle > 0.05 && this.input.right === 0) {
-                this.steerAngle *= 0.3;
+            // Glance heading deflection away from wall only if penetrating and player is NOT actively counter-steering
+            const isCounterSteering = (sign > 0 && (this.input.left > 0 || this.steerAngle > 0.05)) ||
+                                      (sign < 0 && (this.input.right > 0 || this.steerAngle < -0.05));
+            if (!isCounterSteering && sign * this.carHeadingAngle < 0) {
+                // Subtle glance angle inward toward the circuit without locking steering
+                const targetHeading = sign * THREE.MathUtils.lerp(0.02, 0.05, severity);
+                this.carHeadingAngle = THREE.MathUtils.lerp(this.carHeadingAngle, targetHeading, 0.12);
             }
         } else {
             this.inBarrierContact = false;
