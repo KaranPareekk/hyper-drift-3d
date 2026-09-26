@@ -54,6 +54,7 @@ export class VehiclePhysics {
         this.rpm = 1000;
         this.inBarrierContact = false;
         this.justHitBarrier = false;
+        this.justHitObstacle = false;
         this.impactSeverity = 0;
         this.justHitBoostPad = false;
         this.steeringSensitivity = 1.0;
@@ -114,7 +115,10 @@ export class VehiclePhysics {
         // 6. Handle Guardrails and Track Boundaries with Deflection Recovery
         this.handleTrackBoundaries(roadInfo, track, dt);
 
-        // 7. Visual Updates: Chassis Weight Transfer, Wheels, RPM, Lights
+        // 7. Handle Kinetic Hazard Obstacles (Pulsing Shield Spheres) Collision
+        this.handleObstacleCollisions(track, dt);
+
+        // 8. Visual Updates: Chassis Weight Transfer, Wheels, RPM, Lights
         this.updateVisuals(dt);
 
         // 8. Track Lap & Checkpoint Progress
@@ -141,18 +145,18 @@ export class VehiclePhysics {
     processInputs(dt) {
         const speedKmh = Math.abs(this.vLong * 3.6);
 
-        // Speed-dependent steering limit:
-        // Tighter, precision racing steering envelope scaled by player's sensitivity preference
-        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 90.0, 1.2));
+        // Speed-dependent steering limit with high-speed aerodynamic stabilization:
+        // Tighter, precision racing envelope scaled by player's sensitivity preference
+        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 85.0, 1.3));
         const sens = this.steeringSensitivity || 1.0;
-        const maxSteer = THREE.MathUtils.lerp(0.14, 0.28, speedFactor) * sens;
+        const maxSteer = THREE.MathUtils.lerp(0.13, 0.29, speedFactor) * sens;
 
         const rawSteerInput = (this.input.left - this.input.right); // positive = left turn
         const targetSteer = rawSteerInput * maxSteer;
 
-        // Controlled, smooth steering transition rate
+        // Fast, crisp steering transition rate with snappy self-centering
         const isCounterSteer = (this.vLat * rawSteerInput < -0.1);
-        const steerSpeed = (isCounterSteer ? 18.0 : 12.0) * THREE.MathUtils.clamp(sens, 0.8, 1.4);
+        const steerSpeed = (rawSteerInput === 0 ? 17.0 : (isCounterSteer ? 22.0 : 14.0)) * THREE.MathUtils.clamp(sens, 0.8, 1.4);
         this.steerAngle += (targetSteer - this.steerAngle) * Math.min(1.0, steerSpeed * dt);
 
         // Spacebar = BOOST (Nitro). Spacebar NEVER activates brakes or handbrake!
@@ -472,6 +476,72 @@ export class VehiclePhysics {
             }
         } else {
             this.inBarrierContact = false;
+        }
+    }
+
+    handleObstacleCollisions(track, dt = 1.0 / 60.0) {
+        this.justHitObstacle = false;
+        if (!track || !track.kineticObstacles || track.kineticObstacles.length === 0) return;
+
+        const carPos = this.root.position;
+        const carRadius = 1.85;
+
+        for (const obs of track.kineticObstacles) {
+            const obsPos = obs.position;
+            const dist = carPos.distanceTo(obsPos);
+            const minDist = obs.radius + carRadius;
+
+            if (dist < minDist && (!obs.hitCooldown || obs.hitCooldown <= 0)) {
+                obs.hitCooldown = 0.9; // Prevent multiple collisions in consecutive frames
+                this.justHitObstacle = true;
+
+                // Compute horizontal push vector away from obstacle center
+                const pushDir = carPos.clone().sub(obsPos);
+                pushDir.y = 0;
+                if (pushDir.lengthSq() < 0.001) {
+                    pushDir.set(1, 0, 0);
+                } else {
+                    pushDir.normalize();
+                }
+
+                // Push car out of intersection boundary
+                const penetration = minDist - dist;
+                this.root.position.addScaledVector(pushDir, penetration + 0.25);
+                if (track) {
+                    const snap = track.getRoadSurfaceAt(this.root.position);
+                    this.root.position.copy(snap.surfacePoint);
+                }
+
+                // Calculate impulse projection relative to car orientation
+                const dotRight = pushDir.dot(this._carRight);
+
+                // Elastic collision impulse
+                const impulse = Math.max(10.0, Math.abs(this.vLong) * 0.45);
+                this.vLat += (dotRight >= 0 ? 1 : -1) * impulse;
+
+                // Kinetic impact deceleration penalty (-35%)
+                if (this.vLong > 2.0) {
+                    this.vLong *= 0.65;
+                }
+
+                // Spin torque reaction
+                this.yawRate += (dotRight >= 0 ? 1.8 : -1.8);
+
+                // Visual flash on obstacle ring
+                if (obs.ring && obs.ring.material) {
+                    obs.ring.material.emissive.setHex(0xffffff);
+                    obs.ring.material.emissiveIntensity = 5.0;
+                    setTimeout(() => {
+                        if (obs.ring && obs.ring.material) {
+                            obs.ring.material.emissive.setHex(0xff4400);
+                            obs.ring.material.emissiveIntensity = 2.4;
+                        }
+                    }, 240);
+                }
+
+                this.impactSeverity = 0.85;
+                break;
+            }
         }
     }
 

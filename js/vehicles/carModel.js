@@ -303,6 +303,13 @@ export class CarModelBuilder {
         chassis.add(hlL);
         chassis.add(hlR);
 
+        // Dynamic forward road headlights illumination
+        const headSpot = new THREE.SpotLight(0xd8f4ff, 2.8, 55, Math.PI / 5.5, 0.45, 1.4);
+        headSpot.position.set(0, 0.55, -2.1);
+        headSpot.target.position.set(0, 0, -28);
+        chassis.add(headSpot);
+        chassis.add(headSpot.target);
+
         // 12. Full-Width Glowing Rear LED Light Bar
         const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
         const tailGeo = new THREE.BoxGeometry(1.86, 0.06, 0.08);
@@ -485,6 +492,13 @@ export class CarModelBuilder {
         hlR.position.set(0.76, 0.52, -2.15);
         chassis.add(hlL);
         chassis.add(hlR);
+
+        // Dynamic forward road headlights illumination
+        const vortexHeadSpot = new THREE.SpotLight(0xfffae0, 2.8, 55, Math.PI / 5.5, 0.45, 1.4);
+        vortexHeadSpot.position.set(0, 0.58, -2.1);
+        vortexHeadSpot.target.position.set(0, 0, -28);
+        chassis.add(vortexHeadSpot);
+        chassis.add(vortexHeadSpot.target);
 
         // 9. Smoked Dual Taillight Clusters
         const tlMat = new THREE.MeshBasicMaterial({ color: 0xff1500 });

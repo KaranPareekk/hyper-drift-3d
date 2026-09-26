@@ -33,6 +33,7 @@ export class ProceduralTrack {
         this.gantryGroup = null;
         this.checkpointGates = [];
         this.boostPads = [];
+        this.kineticObstacles = [];
 
         this.generateSpline();
     }
@@ -312,6 +313,9 @@ export class ProceduralTrack {
         // Glowing Neon Boost Pads
         this.buildBoostPads(root);
 
+        // High-Tech Kinetic Energy Hazard Obstacles (Pulsing Shield Spheres)
+        this.buildKineticObstacles(root);
+
         // Ground terrain under the track
         this.buildTerrain(root);
 
@@ -373,6 +377,87 @@ export class ProceduralTrack {
                 lastTriggerTime: 0
             });
         }
+    }
+
+    buildKineticObstacles(root) {
+        this.kineticObstacles = [];
+        // Place 4 dynamic kinetic hazard spheres across the track
+        const obstacleProgresses = [0.20, 0.44, 0.68, 0.90];
+        const lateralOffsets = [-0.35, 0.38, -0.32, 0.35]; // offset fraction across track width
+
+        obstacleProgresses.forEach((prog, idx) => {
+            const sampleIdx = Math.floor(prog * this.samplesCount) % this.samplesCount;
+            const pt = this.trackPoints[sampleIdx];
+            const binorm = this.trackBinormals[sampleIdx];
+            const norm = this.trackNormals[sampleIdx];
+            const tan = this.trackTangents[sampleIdx];
+
+            const lateralDist = lateralOffsets[idx] * (this.roadWidth * 0.5);
+            const obsCenter = pt.clone().addScaledVector(binorm, lateralDist).addScaledVector(norm, 1.45);
+
+            const obsGroup = new THREE.Group();
+            obsGroup.position.copy(obsCenter);
+
+            // Construct road-relative orientation so obstacle aligns with the banked surface
+            const rotMat = new THREE.Matrix4();
+            rotMat.makeBasis(binorm, norm, tan.clone().negate());
+            obsGroup.quaternion.setFromRotationMatrix(rotMat);
+
+            // 1. High-Tech Kinetic Hazard Sphere (Dark chrome alloy with emissive orange core)
+            const sphereGeo = new THREE.SphereGeometry(1.35, 24, 20);
+            const sphereMat = new THREE.MeshStandardMaterial({
+                color: 0x161a26,
+                metalness: 0.92,
+                roughness: 0.22,
+                emissive: 0x220c00,
+                emissiveIntensity: 0.8
+            });
+            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+            obsGroup.add(sphereMesh);
+
+            // 2. Equatorial Revolving Hazard Warning Ring
+            const ringGeo = new THREE.TorusGeometry(1.85, 0.14, 16, 36);
+            const ringMat = new THREE.MeshStandardMaterial({
+                color: 0xff5500,
+                emissive: 0xff4400,
+                emissiveIntensity: 2.4,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = Math.PI / 2;
+            obsGroup.add(ringMesh);
+
+            // 3. Pulsing Neon Strobe / Warning Point Light
+            const warningLight = new THREE.PointLight(0xff5500, 2.8, 14, 1.8);
+            warningLight.position.set(0, 0, 0);
+            obsGroup.add(warningLight);
+
+            // 4. Ground Shadow Projection Decal on Road Surface
+            const shadowGeo = new THREE.CircleGeometry(1.65, 24);
+            shadowGeo.rotateX(-Math.PI / 2);
+            const shadowMat = new THREE.MeshBasicMaterial({
+                color: 0x05070a,
+                transparent: true,
+                opacity: 0.7
+            });
+            const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+            shadowMesh.position.y = -1.38;
+            obsGroup.add(shadowMesh);
+
+            root.add(obsGroup);
+
+            this.kineticObstacles.push({
+                group: obsGroup,
+                sphere: sphereMesh,
+                ring: ringMesh,
+                light: warningLight,
+                baseY: obsCenter.y,
+                position: obsCenter,
+                radius: 1.75,
+                hitCooldown: 0
+            });
+        });
     }
 
     buildStartGantry(root) {
@@ -641,5 +726,25 @@ export class ProceduralTrack {
             normal: surfaceData.normal,
             binormal: surfaceData.binormal
         };
+    }
+
+    update(dt) {
+        if (!this.kineticObstacles || this.kineticObstacles.length === 0) return;
+        const time = performance.now() * 0.003;
+        for (let i = 0; i < this.kineticObstacles.length; i++) {
+            const obs = this.kineticObstacles[i];
+            if (obs.ring) {
+                obs.ring.rotation.z += 2.2 * dt;
+            }
+            if (obs.sphere) {
+                obs.sphere.rotation.y += 0.8 * dt;
+            }
+            if (obs.group) {
+                obs.group.position.y = obs.baseY + Math.sin(time * 2.0 + i * 1.5) * 0.15;
+            }
+            if (obs.hitCooldown > 0) {
+                obs.hitCooldown -= dt;
+            }
+        }
     }
 }

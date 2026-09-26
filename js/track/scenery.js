@@ -27,13 +27,35 @@ export class SceneryBuilder {
 
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-            const dist = 360 + Math.random() * 320;
-            const x = Math.cos(angle) * dist;
-            const z = Math.sin(angle) * dist;
+            let dist = 380 + Math.random() * 340;
+            let x = Math.cos(angle) * dist;
+            let z = Math.sin(angle) * dist;
 
             const width = 25 + Math.random() * 35;
             const depth = 25 + Math.random() * 35;
             const height = 80 + Math.random() * 220;
+
+            // Clearance check: Ensure building footprint NEVER intersects or encroaches within the roadway corridor
+            const clearanceRadius = Math.max(width, depth) * 0.85 + (this.track.roadWidth * 0.5) + 16.0;
+            let tooClose = false;
+            if (this.track && this.track.trackPoints) {
+                for (let s = 0; s < this.track.samplesCount; s += 6) {
+                    const pt = this.track.trackPoints[s];
+                    const dx = pt.x - x;
+                    const dz = pt.z - z;
+                    if ((dx * dx + dz * dz) < (clearanceRadius * clearanceRadius)) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+            }
+
+            if (tooClose) {
+                // Push building safely outside the track boundary
+                dist += 140;
+                x = Math.cos(angle) * dist;
+                z = Math.sin(angle) * dist;
+            }
 
             const baseMat = new THREE.MeshStandardMaterial({
                 color: buildingColors[Math.floor(Math.random() * buildingColors.length)],
@@ -123,10 +145,11 @@ export class SceneryBuilder {
         for (let i = 0; i < this.track.samplesCount; i += step) {
             const pt = this.track.trackPoints[i];
             const binormal = this.track.trackBinormals[i];
+            const norm = this.track.trackNormals[i] || new THREE.Vector3(0, 1, 0);
             const side = (Math.floor(i / step) % 2 === 0) ? -1 : 1;
 
-            const polePos = pt.clone().addScaledVector(binormal, side * (this.track.roadWidth * 0.5 + 2.5));
-            polePos.y = pt.y;
+            // Placed well outside the barrier guardrails
+            const polePos = pt.clone().addScaledVector(binormal, side * (this.track.roadWidth * 0.5 + 3.5));
 
             const pole = new THREE.Mesh(lampGeo, lampMat);
             pole.position.set(polePos.x, polePos.y + 4.5, polePos.z);
@@ -134,8 +157,8 @@ export class SceneryBuilder {
 
             // Glowing light head
             const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-            const bulbPos = polePos.clone().addScaledVector(binormal, -side * 1.5);
-            bulb.position.set(bulbPos.x, polePos.y + 8.8, bulbPos.z);
+            const bulbPos = polePos.clone().addScaledVector(binormal, -side * 1.5).addScaledVector(norm, 4.2);
+            bulb.position.set(bulbPos.x, bulbPos.y, bulbPos.z);
             this.root.add(bulb);
 
             // Add real illumination pool every few lamps along the road

@@ -126,6 +126,18 @@ class Game {
         if (this.trackMesh) this.scene.remove(this.trackMesh);
         if (this.scenery && this.scenery.root) this.scene.remove(this.scenery.root);
 
+        // Remove showroom turntable and car if starting/running a race
+        if (this.gameState !== 'LOBBY') {
+            if (this.showroomCar) {
+                this.scene.remove(this.showroomCar.root);
+                this.showroomCar = null;
+            }
+            if (this.showroomTurntable) {
+                this.scene.remove(this.showroomTurntable);
+                this.showroomTurntable = null;
+            }
+        }
+
         // Generate new procedural track
         this.track = new ProceduralTrack(this.trackSeed);
         this.trackMesh = this.track.buildMeshes(this.scene);
@@ -305,7 +317,7 @@ class Game {
 
     setupInputs() {
         const handleKeyDown = (e) => {
-            // Prevent Spacebar, arrow keys, and WASD from browser navigation / scrolling
+            // Prevent gameplay keys from triggering browser scrolling, buttons, or navigation
             const code = e.code;
             const key = e.key ? e.key.toLowerCase() : '';
             if (code === 'Space' || key === ' ' || 
@@ -318,7 +330,8 @@ class Game {
                 code === 'KeyQ' || key === 'q' ||
                 code === 'KeyE' || key === 'e' ||
                 code === 'KeyP' || key === 'p' ||
-                code === 'KeyR' || key === 'r') {
+                code === 'KeyR' || key === 'r' ||
+                ((code === 'Enter' || code === 'NumpadEnter' || key === 'enter') && (this.gameState === 'RACING' || this.gameState === 'COUNTDOWN' || this.isSplitScreen))) {
                 e.preventDefault();
             }
 
@@ -434,6 +447,7 @@ class Game {
                 // --- SINGLE PLAYER / ONLINE MULTIPLAYER (Full multi-layout support) ---
                 const isW = Boolean(
                     this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || 
+                    this.keys['Enter'] || this.keys['NumpadEnter'] || this.keys['enter'] ||
                     this.keys['ArrowUp'] || this.keys['Up'] || this.keys['Numpad8']
                 );
                 const isS = Boolean(
@@ -475,12 +489,15 @@ class Game {
                 }
             } else {
                 // --- 2-PLAYER LOCAL SPLIT-SCREEN (Strictly Decoupled) ---
-                // PLAYER 1 (Left Screen): WASD for movement + Space for acceleration
+                // PLAYER 1 (Left Screen): WASD for steering/reverse + ENTER for acceleration
                 const p1SteerLeft = Boolean(this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys['KeyQ'] || this.keys['q']);
                 const p1SteerRight = Boolean(this.keys['KeyD'] || this.keys['d'] || this.keys['D']);
                 const p1Reverse = Boolean(this.keys['KeyS'] || this.keys['s'] || this.keys['S']);
-                const p1Accelerate = Boolean(this.keys['Space'] || this.keys[' '] || this.keys['KeyW'] || this.keys['w'] || this.keys['W']);
-                const p1Boost = Boolean(this.keys['KeyE'] || this.keys['e'] || this.keys['KeyQ'] || this.keys['q']);
+                const p1Accelerate = Boolean(
+                    this.keys['Enter'] || this.keys['enter'] || this.keys['NumpadEnter'] || 
+                    this.keys['KeyW'] || this.keys['w'] || this.keys['W']
+                );
+                const p1Boost = Boolean(this.keys['KeyE'] || this.keys['e'] || this.keys['Space'] || this.keys[' ']);
 
                 this.playerPhysics.input.forward = p1Accelerate ? 1 : 0;
                 this.playerPhysics.input.backward = p1Reverse ? 1 : 0;
@@ -489,7 +506,7 @@ class Game {
                 this.playerPhysics.input.nitro = p1Boost;
                 this.playerPhysics.input.handbrake = false;
 
-                // PLAYER 2 (Right Screen): Arrow keys for movement + Shift for acceleration
+                // PLAYER 2 (Right Screen): Arrow keys for steering/reverse + SHIFT for acceleration
                 if (this.player2Physics) {
                     const p2SteerLeft = Boolean(this.keys['ArrowLeft'] || this.keys['Left']);
                     const p2SteerRight = Boolean(this.keys['ArrowRight'] || this.keys['Right']);
@@ -498,7 +515,9 @@ class Game {
                         this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || 
                         this.keys['ArrowUp'] || this.keys['Up']
                     );
-                    const p2Boost = Boolean(this.keys['Numpad0'] || this.keys['ControlRight'] || this.keys['Enter']);
+                    const p2Boost = Boolean(
+                        this.keys['Numpad0'] || this.keys['ControlRight'] || this.keys['ControlLeft']
+                    );
 
                     this.player2Physics.input.forward = p2Accelerate ? 1 : 0;
                     this.player2Physics.input.backward = p2Reverse ? 1 : 0;
@@ -598,6 +617,17 @@ class Game {
                         this.playerPhysics.justHitBarrier = false;
                     }
 
+                    if (this.playerPhysics.justHitObstacle) {
+                        this.sound.playBarrierImpact(0.85);
+                        this.sound.playSparkSound();
+                        if (this.renderer && this.renderer.emitSparks) {
+                            this.renderer.emitSparks(this.playerPhysics.root.position, 28);
+                        }
+                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.45);
+                        this.hud.showBanner("HAZARD COLLISION! 💥", 900);
+                        this.playerPhysics.justHitObstacle = false;
+                    }
+
                     if (this.playerPhysics.justHitBoostPad) {
                         this.sound.playBoostPad();
                         this.hud.showBanner("BOOST PAD! ⚡", 1100);
@@ -612,6 +642,11 @@ class Game {
                         this.gameState = 'FINISHED';
                         this.hud.showBanner("RACE COMPLETE! 🏆", 5000);
                     }
+                }
+
+                // Update dynamic track props (kinetic hazard spheres, gates)
+                if (this.track && typeof this.track.update === 'function') {
+                    this.track.update(dt);
                 }
 
                 // Update AI Rivals
@@ -653,6 +688,16 @@ class Game {
                         }
                         this.playerPhysics.justHitBarrier = false;
                     }
+                    if (this.playerPhysics.justHitObstacle) {
+                        this.sound.playBarrierImpact(0.85);
+                        this.sound.playSparkSound();
+                        if (this.renderer && this.renderer.emitSparks) {
+                            this.renderer.emitSparks(this.playerPhysics.root.position, 22);
+                        }
+                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.40);
+                        this.hud.showBanner("P1 HAZARD HIT! 💥", 900);
+                        this.playerPhysics.justHitObstacle = false;
+                    }
                     if (this.playerPhysics.justHitBoostPad) {
                         this.sound.playBoostPad();
                         this.hud.showBanner("P1 BOOST PAD! ⚡", 1000);
@@ -668,10 +713,25 @@ class Game {
                         }
                         this.player2Physics.justHitBarrier = false;
                     }
+                    if (this.player2Physics.justHitObstacle) {
+                        this.sound.playBarrierImpact(0.85);
+                        this.sound.playSparkSound();
+                        if (this.renderer && this.renderer.emitSparks) {
+                            this.renderer.emitSparks(this.player2Physics.root.position, 22);
+                        }
+                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.40);
+                        this.hud.showBanner("P2 HAZARD HIT! 💥", 900);
+                        this.player2Physics.justHitObstacle = false;
+                    }
                     if (this.player2Physics.justHitBoostPad) {
                         this.sound.playBoostPad();
                         this.hud.showBanner("P2 BOOST PAD! ⚡", 1000);
                         this.player2Physics.justHitBoostPad = false;
+                    }
+
+                    // Update dynamic track props
+                    if (this.track && typeof this.track.update === 'function') {
+                        this.track.update(dt);
                     }
 
                     // Dual camera update

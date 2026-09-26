@@ -96,62 +96,26 @@ export class LobbyUI {
             });
         }
 
-        // Multiplayer Create Room
-        if (this.btnCreateRoom) {
-            this.btnCreateRoom.addEventListener('click', async () => {
-                if (this.roomStatusEl) this.roomStatusEl.innerText = "Creating room...";
-                try {
-                    const code = await this.game.multiplayer.createRoom();
-                    if (this.roomStatusEl) {
-                        this.roomStatusEl.innerHTML = `
-                            <div style="background: rgba(0,240,255,0.1); border: 1px solid #00f0ff; border-radius: 8px; padding: 0.6rem; margin-top: 0.4rem;">
-                                <div>Room Code: <strong style="color:#00f0ff; font-size:1.25rem; letter-spacing: 2px;">${code}</strong></div>
-                                <div style="font-size: 0.78rem; color: #8fa0c0; margin: 4px 0;">Share this code with your friend. Waiting for opponent...</div>
-                                <button id="btnHostStartNow" class="btn-primary" style="padding: 0.45rem; font-size: 0.8rem; margin-top: 4px;">START RACE NOW</button>
-                            </div>
-                        `;
-                        const startNowBtn = document.getElementById('btnHostStartNow');
-                        if (startNowBtn) {
-                            startNowBtn.addEventListener('click', () => {
-                                this.startGame(true);
-                            });
-                        }
-                    }
+        // Multiplayer System (Temporarily Disabled - Shows Coming Soon notice)
+        const showComingSoonNotice = () => {
+            if (this.roomStatusEl) {
+                this.roomStatusEl.innerHTML = `
+                    <div class="coming-soon-badge">
+                        <span>🔒 Coming Soon / Not Yet Available</span>
+                    </div>
+                `;
+            }
+        };
 
-                    // Auto-launch when friend joins
-                    this.game.multiplayer.onPeerConnected = (peerId) => {
-                        if (this.roomStatusEl) {
-                            this.roomStatusEl.innerHTML = `<strong style="color:#00ff88; font-size: 1.05rem;">OPPONENT CONNECTED! 🏎️ Launching race...</strong>`;
-                        }
-                        setTimeout(() => {
-                            this.startGame(true);
-                        }, 1200);
-                    };
-                } catch (e) {
-                    if (this.roomStatusEl) this.roomStatusEl.innerText = "Failed to connect to room server. Starting solo...";
-                    setTimeout(() => this.startGame(false), 1500);
-                }
+        if (this.btnCreateRoom) {
+            this.btnCreateRoom.addEventListener('click', () => {
+                showComingSoonNotice();
             });
         }
 
-        // Multiplayer Join Room
         if (this.btnJoinRoom) {
-            this.btnJoinRoom.addEventListener('click', async () => {
-                const code = this.roomCodeInput.value.trim().toUpperCase();
-                if (!code) {
-                    alert("Please enter a room code!");
-                    return;
-                }
-                if (this.roomStatusEl) this.roomStatusEl.innerText = `Connecting to room ${code}...`;
-                try {
-                    await this.game.multiplayer.joinRoom(code);
-                    if (this.roomStatusEl) this.roomStatusEl.innerHTML = `<strong style="color:#00ff88; font-size: 1.05rem;">CONNECTED! 🏎️ Loading track and joining race...</strong>`;
-                    setTimeout(() => {
-                        this.startGame(true);
-                    }, 1000);
-                } catch (e) {
-                    if (this.roomStatusEl) this.roomStatusEl.innerText = "Could not find room with that code. Make sure the host has created it!";
-                }
+            this.btnJoinRoom.addEventListener('click', () => {
+                showComingSoonNotice();
             });
         }
     }
