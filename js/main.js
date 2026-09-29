@@ -564,7 +564,21 @@ class Game {
     }
 }
 
-// Instantiate game on DOM ready
-window.addEventListener('DOMContentLoaded', () => {
-    window.game = new Game();
-});
+// Reliable multi-state boot sequence (prevents missed DOMContentLoaded in ES modules)
+function launchGame() {
+    if (!window.game) {
+        try {
+            window.game = new Game();
+            console.log("Hyper Drift 3D initialized successfully.");
+        } catch (e) {
+            console.error("Fatal error starting Hyper Drift 3D:", e);
+        }
+    }
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', launchGame);
+    window.addEventListener('load', launchGame);
+} else {
+    launchGame();
+}

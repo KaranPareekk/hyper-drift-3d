@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export class GameRenderer {
     constructor(canvasContainer) {
-        this.container = canvasContainer;
+        this.container = canvasContainer || document.getElementById('gameCanvasContainer') || document.body;
 
         // Scene & Atmosphere (High visibility twilight)
         this.scene = new THREE.Scene();

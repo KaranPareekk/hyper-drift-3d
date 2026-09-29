@@ -6,15 +6,14 @@
     <title>HYPERDRIFT 3D - Multiplayer Procedural Racer</title>
     <link rel="stylesheet" href="css/style.css">
 
-    <!-- PeerJS for WebRTC Multiplayer -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- PeerJS for WebRTC Multiplayer (Local Offline-Ready) -->
+    <script src="lib/peerjs.min.js"></script>
 
-    <!-- Three.js ES Module Import Map -->
+    <!-- Three.js ES Module Import Map (Local Offline-Ready) -->
     <script type="importmap">
     {
         "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            "three": "./lib/three.module.js"
         }
     }
     </script>
