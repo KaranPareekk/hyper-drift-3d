@@ -72,40 +72,72 @@ body, html {
     text-transform: uppercase;
 }
 
-/* Bottom Control Panel */
-.menu-bottom-panel {
+/* Decoupled Corner Layout for Showroom Lobby (Unobstructed Car View) */
+.menu-corner-card {
+    position: absolute;
+    z-index: 15;
+    pointer-events: auto;
+    width: 325px;
+    max-width: calc(100vw - 3rem);
+}
+
+.corner-top-right {
+    top: 2.2rem;
+    right: 2.5rem;
+}
+
+.corner-bottom-left {
+    bottom: 2.2rem;
+    left: 2.5rem;
+}
+
+.corner-bottom-right {
+    bottom: 2.2rem;
+    right: 2.5rem;
+}
+
+.section-label-mini {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: #8fa0c0;
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
-    gap: 2rem;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+
+.highlight-val {
+    color: #00f0ff;
+    font-weight: 700;
+}
+
+.car-tab-sub {
+    font-size: 0.68rem;
+    color: #8fa0c0;
+    font-weight: 500;
+    margin-top: 3px;
+    letter-spacing: 0.5px;
 }
 
 /* Glassmorphic Panel Cards */
 .glass-card {
-    background: rgba(14, 20, 35, 0.72);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(0, 240, 255, 0.22);
+    background: rgba(14, 20, 35, 0.78);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 240, 255, 0.25);
     border-radius: 14px;
-    padding: 1.4rem 1.8rem;
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-/* Car Selector Cards */
-.car-selection-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    min-width: 320px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .section-label {
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     letter-spacing: 2px;
     color: #00f0ff;
     text-transform: uppercase;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.45rem;
 }
 
 .car-tabs {

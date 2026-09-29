@@ -302,6 +302,65 @@ export class HUD {
                 this.p2Pos.style.color = "#ff0055";
             }
         }
+
+        // Draw split speed lines for P1 and P2
+        this.drawSplitSpeedLines(p1Physics, p2Physics);
+    }
+
+    drawSplitSpeedLines(p1Physics, p2Physics) {
+        if (!this.speedLinesCtx || !this.speedLinesCanvas) return;
+        const ctx = this.speedLinesCtx;
+        const w = this.speedLinesCanvas.width;
+        const h = this.speedLinesCanvas.height;
+        const halfW = w * 0.5;
+
+        const p1Active = p1Physics && (p1Physics.getSpeedKmh() > 165 || p1Physics.isNitro);
+        const p2Active = p2Physics && (p2Physics.getSpeedKmh() > 165 || p2Physics.isNitro);
+
+        if (!p1Active && !p2Active) {
+            if (this.speedLinesCanvas.style.opacity !== '0') {
+                this.speedLinesCanvas.style.opacity = '0';
+                ctx.clearRect(0, 0, w, h);
+            }
+            return;
+        }
+
+        this.speedLinesCanvas.style.opacity = '1';
+        ctx.clearRect(0, 0, w, h);
+
+        if (p1Active) {
+            const cx1 = halfW * 0.5;
+            const cy1 = h * 0.48;
+            const num = p1Physics.isNitro ? 20 : 12;
+            ctx.strokeStyle = p1Physics.isNitro ? 'rgba(0, 240, 255, 0.45)' : 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 1.8;
+            for (let i = 0; i < num; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const innerR = Math.min(halfW, h) * (0.28 + Math.random() * 0.20);
+                const outerR = Math.min(halfW, h) * (0.55 + Math.random() * 0.35);
+                ctx.beginPath();
+                ctx.moveTo(cx1 + Math.cos(angle) * innerR, cy1 + Math.sin(angle) * innerR);
+                ctx.lineTo(cx1 + Math.cos(angle) * outerR, cy1 + Math.sin(angle) * outerR);
+                ctx.stroke();
+            }
+        }
+
+        if (p2Active) {
+            const cx2 = halfW + halfW * 0.5;
+            const cy2 = h * 0.48;
+            const num = p2Physics.isNitro ? 20 : 12;
+            ctx.strokeStyle = p2Physics.isNitro ? 'rgba(255, 0, 85, 0.45)' : 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 1.8;
+            for (let i = 0; i < num; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const innerR = Math.min(halfW, h) * (0.28 + Math.random() * 0.20);
+                const outerR = Math.min(halfW, h) * (0.55 + Math.random() * 0.35);
+                ctx.beginPath();
+                ctx.moveTo(cx2 + Math.cos(angle) * innerR, cy2 + Math.sin(angle) * innerR);
+                ctx.lineTo(cx2 + Math.cos(angle) * outerR, cy2 + Math.sin(angle) * outerR);
+                ctx.stroke();
+            }
+        }
     }
 
     formatTime(sec) {

@@ -39,6 +39,9 @@ export class GameRenderer {
         // Spark particles system for barrier scrapes
         this.setupSparkSystem();
 
+        // Tire smoke particle system for authentic drifting
+        this.setupTireSmokeSystem();
+
         // Camera chase parameters
         this.cameraOffset = new THREE.Vector3(0, 3.4, 7.8);
         this.cameraLookOffset = new THREE.Vector3(0, 1.3, 5.0);
@@ -207,6 +210,81 @@ export class GameRenderer {
         }
     }
 
+    setupTireSmokeSystem() {
+        this.maxSmoke = 160;
+        this.smokeGeo = new THREE.BufferGeometry();
+        this.smokePositions = new Float32Array(this.maxSmoke * 3);
+        this.smokeVelocities = [];
+        this.smokeLives = new Float32Array(this.maxSmoke);
+
+        for (let i = 0; i < this.maxSmoke; i++) {
+            this.smokePositions[i * 3] = 0;
+            this.smokePositions[i * 3 + 1] = -9999;
+            this.smokePositions[i * 3 + 2] = 0;
+            this.smokeVelocities.push(new THREE.Vector3());
+            this.smokeLives[i] = 0;
+        }
+
+        this.smokeGeo.setAttribute('position', new THREE.BufferAttribute(this.smokePositions, 3));
+        this.smokeMat = new THREE.PointsMaterial({
+            color: 0xdddddd,
+            size: 1.1,
+            transparent: true,
+            opacity: 0.30,
+            depthWrite: false
+        });
+
+        this.smokePoints = new THREE.Points(this.smokeGeo, this.smokeMat);
+        this.scene.add(this.smokePoints);
+    }
+
+    emitTireSmoke(pos, count = 2) {
+        if (!this.smokeVelocities) return;
+        let spawned = 0;
+        for (let i = 0; i < this.maxSmoke && spawned < count; i++) {
+            if (this.smokeLives[i] <= 0) {
+                this.smokeLives[i] = 0.45 + Math.random() * 0.3;
+                const idx = i * 3;
+                this.smokePositions[idx] = pos.x + (Math.random() - 0.5) * 0.35;
+                this.smokePositions[idx + 1] = pos.y + 0.12 + Math.random() * 0.1;
+                this.smokePositions[idx + 2] = pos.z + (Math.random() - 0.5) * 0.35;
+
+                const v = this.smokeVelocities[i];
+                v.set(
+                    (Math.random() - 0.5) * 1.5,
+                    Math.random() * 1.0 + 0.6,
+                    (Math.random() - 0.5) * 1.5
+                );
+                spawned++;
+            }
+        }
+        this.smokeGeo.attributes.position.needsUpdate = true;
+    }
+
+    updateTireSmoke(dt) {
+        if (!this.smokeVelocities) return;
+        let hasActive = false;
+        for (let i = 0; i < this.maxSmoke; i++) {
+            if (this.smokeLives[i] > 0) {
+                this.smokeLives[i] -= dt;
+                const idx = i * 3;
+                const v = this.smokeVelocities[i];
+
+                this.smokePositions[idx] += v.x * dt;
+                this.smokePositions[idx + 1] += v.y * dt;
+                this.smokePositions[idx + 2] += v.z * dt;
+                hasActive = true;
+
+                if (this.smokeLives[i] <= 0) {
+                    this.smokePositions[idx + 1] = -9999;
+                }
+            }
+        }
+        if (hasActive) {
+            this.smokeGeo.attributes.position.needsUpdate = true;
+        }
+    }
+
     snapCamera(targetPhysics) {
         if (!targetPhysics) return;
         const carRoot = targetPhysics.root;
@@ -240,8 +318,9 @@ export class GameRenderer {
     updateCamera(targetPhysics, dt) {
         if (!targetPhysics) return;
 
-        // Update active spark particles
+        // Update active particles (sparks & tire smoke)
         this.updateSparks(dt);
+        this.updateTireSmoke(dt);
 
         const carRoot = targetPhysics.root;
         const speedKmh = targetPhysics.getSpeedKmh();
@@ -289,7 +368,7 @@ export class GameRenderer {
         this.dirLight.position.z = carRoot.position.z + 100;
         this.dirLight.target = carRoot;
 
-        // Skidmarks
+        // Skidmarks & Tire Smoke
         if (targetPhysics.isDrifting && targetPhysics.wheels && speedKmh > 35) {
             const rlPos = new THREE.Vector3();
             targetPhysics.wheels.rearLeft.getWorldPosition(rlPos);
@@ -302,6 +381,9 @@ export class GameRenderer {
             }
             this.lastRlPos = rlPos.clone();
             this.lastRrPos = rrPos.clone();
+
+            this.emitTireSmoke(rlPos, 1);
+            this.emitTireSmoke(rrPos, 1);
         } else {
             this.lastRlPos = null;
             this.lastRrPos = null;
@@ -309,8 +391,9 @@ export class GameRenderer {
     }
 
     updateSplitCameras(p1Physics, p2Physics, dt) {
-        // Update sparks
+        // Update particles (sparks & tire smoke)
         this.updateSparks(dt);
+        this.updateTireSmoke(dt);
 
         // --- Player 1 Camera (Left Viewport) ---
         if (p1Physics) {
@@ -344,6 +427,16 @@ export class GameRenderer {
             this.currentCameraRoll += (roll1 - this.currentCameraRoll) * 6.0 * dt;
             if (Math.abs(this.currentCameraRoll) > 0.0005) {
                 this.camera.rotateZ(this.currentCameraRoll);
+            }
+
+            // P1 Skidmarks & Tire Smoke
+            if (p1Physics.isDrifting && p1Physics.wheels && speed1 > 35) {
+                const rl = new THREE.Vector3();
+                p1Physics.wheels.rearLeft.getWorldPosition(rl);
+                const rr = new THREE.Vector3();
+                p1Physics.wheels.rearRight.getWorldPosition(rr);
+                this.emitTireSmoke(rl, 1);
+                this.emitTireSmoke(rr, 1);
             }
         }
 
@@ -379,6 +472,16 @@ export class GameRenderer {
             this.currentCamera2Roll += (roll2 - this.currentCamera2Roll) * 6.0 * dt;
             if (Math.abs(this.currentCamera2Roll) > 0.0005) {
                 this.camera2.rotateZ(this.currentCamera2Roll);
+            }
+
+            // P2 Skidmarks & Tire Smoke
+            if (p2Physics.isDrifting && p2Physics.wheels && speed2 > 35) {
+                const rl = new THREE.Vector3();
+                p2Physics.wheels.rearLeft.getWorldPosition(rl);
+                const rr = new THREE.Vector3();
+                p2Physics.wheels.rearRight.getWorldPosition(rr);
+                this.emitTireSmoke(rl, 1);
+                this.emitTireSmoke(rr, 1);
             }
         }
 

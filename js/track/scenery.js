@@ -18,25 +18,34 @@ export class SceneryBuilder {
     }
 
     buildSkyscrapers() {
-        // Instantiate a neon skyline around the outer perimeter
-        const count = 75;
+        // Instantiate a vibrant, appropriately scaled apartment skyline around the circuit
+        const count = 110;
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-        const buildingColors = [0x0d111a, 0x111624, 0x090d14, 0x141a29];
-        const neonColors = [0x00f0ff, 0xff0055, 0x7928ca, 0x00ff88];
+        const buildingColors = [0x0d111a, 0x111624, 0x090d14, 0x141a29, 0x181e2e];
+        const neonColors = [0x00f0ff, 0xff0055, 0x7928ca, 0x00ff88, 0xffaa00];
+
+        // Shared materials to minimize draw calls and optimize WebGL performance
+        const materials = buildingColors.map(c => new THREE.MeshStandardMaterial({
+            color: c,
+            roughness: 0.65,
+            metalness: 0.75
+        }));
 
         for (let i = 0; i < count; i++) {
-            const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-            let dist = 380 + Math.random() * 340;
+            const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+            const ring = i % 2;
+            let dist = (ring === 0 ? 280 : 370) + Math.random() * 120;
             let x = Math.cos(angle) * dist;
             let z = Math.sin(angle) * dist;
 
-            const width = 25 + Math.random() * 35;
-            const depth = 25 + Math.random() * 35;
-            const height = 80 + Math.random() * 220;
+            // Scaled down apartment building dimensions (11-23m wide/deep, 24-72m high)
+            const width = 11 + Math.random() * 12;
+            const depth = 11 + Math.random() * 12;
+            const height = 24 + Math.random() * 48;
 
-            // Clearance check: Ensure building footprint NEVER intersects or encroaches within the roadway corridor
-            const clearanceRadius = Math.max(width, depth) * 0.85 + (this.track.roadWidth * 0.5) + 16.0;
+            // Clearance check: Ensure building footprint NEVER encroaches within the roadway corridor
+            const clearanceRadius = Math.max(width, depth) * 0.85 + (this.track.roadWidth * 0.5) + 14.0;
             let tooClose = false;
             if (this.track && this.track.trackPoints) {
                 for (let s = 0; s < this.track.samplesCount; s += 6) {
@@ -52,30 +61,32 @@ export class SceneryBuilder {
 
             if (tooClose) {
                 // Push building safely outside the track boundary
-                dist += 140;
+                dist += 95;
                 x = Math.cos(angle) * dist;
                 z = Math.sin(angle) * dist;
             }
 
-            const baseMat = new THREE.MeshStandardMaterial({
-                color: buildingColors[Math.floor(Math.random() * buildingColors.length)],
-                roughness: 0.6,
-                metalness: 0.8
-            });
-
+            const baseMat = materials[i % materials.length];
             const building = new THREE.Mesh(boxGeo, baseMat);
             building.scale.set(width, height, depth);
-            building.position.set(x, height * 0.5 - 2, z);
+            building.position.set(x, height * 0.5 - 1, z);
             this.root.add(building);
 
-            // Glowing rooftop neon beacon / antenna
-            if (Math.random() > 0.3) {
-                const beaconGeo = new THREE.CylinderGeometry(0.5, 0.5, 18, 8);
+            // Rooftop elevator penthouse / utility structure
+            const roofBox = new THREE.Mesh(boxGeo, baseMat);
+            roofBox.scale.set(width * 0.38, 2.8, depth * 0.38);
+            roofBox.position.set(x, height + 1.4, z);
+            this.root.add(roofBox);
+
+            // Scaled glowing rooftop neon beacon / antenna
+            if (Math.random() > 0.25) {
+                const antennaHeight = 6 + Math.random() * 6;
+                const beaconGeo = new THREE.CylinderGeometry(0.2, 0.2, antennaHeight, 8);
                 const beaconMat = new THREE.MeshBasicMaterial({
                     color: neonColors[Math.floor(Math.random() * neonColors.length)]
                 });
                 const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-                beacon.position.set(x, height + 8, z);
+                beacon.position.set(x, height + 2.8 + antennaHeight * 0.5, z);
                 this.root.add(beacon);
             }
         }

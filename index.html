@@ -25,69 +25,66 @@
 
     <!-- MAIN MENU / SHOWROOM LOBBY -->
     <div id="menuScreen">
+        <!-- Top-Left: Brand Header -->
         <div class="brand-header">
             <h1 class="brand-title">HYPERDRIFT 3D</h1>
             <p class="brand-subtitle">Procedural Circuit &bull; Pure Arcade &bull; Multiplayer</p>
         </div>
 
-        <div class="menu-bottom-panel">
-            <!-- Left: Car Selector & Color -->
-            <div class="glass-card car-selection-group">
-                <div class="section-label">Select Hypercar</div>
-                <div class="car-tabs">
-                    <button id="btnSelectApex" class="car-tab-btn active">
-                        APEX PHANTOM
-                        <div style="font-size: 0.72rem; color: #8fa0c0; font-weight: 500; margin-top: 4px;">Le Mans Downforce Spec</div>
-                    </button>
-                    <button id="btnSelectVortex" class="car-tab-btn">
-                        VORTEX GT
-                        <div style="font-size: 0.72rem; color: #8fa0c0; font-weight: 500; margin-top: 4px;">Widebody Drift Beast</div>
-                    </button>
+        <!-- Top-Right Corner: Circuit Configuration & Controls Sensitivity -->
+        <div id="cornerModeSelect" class="glass-card menu-corner-card corner-top-right">
+            <div class="section-label">Circuit &amp; Handling</div>
+            <div class="seed-row">
+                <input type="text" id="trackSeedInput" class="neon-input" value="DRIFT-X9" placeholder="ENTER SEED">
+                <button id="btnRandomSeed" class="btn-icon" title="Roll New Track">🎲 ROLL</button>
+            </div>
+            <div class="menu-field-group" style="margin-top: 0.6rem;">
+                <div class="section-label-mini">
+                    <span>STEERING SENSITIVITY</span>
+                    <span id="txtSensitivityMenu" class="highlight-val">1.0x</span>
                 </div>
+                <input type="range" id="sliderSensitivityMenu" min="0.5" max="1.8" step="0.1" value="1.0" class="neon-slider" title="Adjust Turning Sharpness">
+            </div>
+        </div>
 
-                <div class="section-label" style="margin-top: 0.8rem;">Livery Finish</div>
-                <div class="color-palette">
-                    <div class="color-dot active" data-color="00e5ff" style="background: #00e5ff;" title="Electric Cyan"></div>
-                    <div class="color-dot" data-color="ff0055" style="background: #ff0055;" title="Neon Magenta"></div>
-                    <div class="color-dot" data-color="ffd700" style="background: #ffd700;" title="Racing Gold"></div>
-                    <div class="color-dot" data-color="00ff88" style="background: #00ff88;" title="Acid Green"></div>
-                    <div class="color-dot" data-color="18191e" style="background: #18191e;" title="Obsidian Carbon"></div>
-                </div>
+        <!-- Bottom-Left Corner: Car Selector & Livery Customization -->
+        <div id="cornerCarSelect" class="glass-card menu-corner-card corner-bottom-left">
+            <div class="section-label">Select Hypercar</div>
+            <div class="car-tabs">
+                <button id="btnSelectApex" class="car-tab-btn active">
+                    APEX PHANTOM
+                    <div class="car-tab-sub">Le Mans Downforce</div>
+                </button>
+                <button id="btnSelectVortex" class="car-tab-btn">
+                    VORTEX GT
+                    <div class="car-tab-sub">Widebody Drift Beast</div>
+                </button>
             </div>
 
-            <!-- Right: Track Seed & Race Mode -->
-            <div class="glass-card setup-group">
-                <div>
-                    <div class="section-label">Procedural Track Generator</div>
-                    <div class="seed-row">
-                        <input type="text" id="trackSeedInput" class="neon-input" value="DRIFT-X9" placeholder="ENTER SEED">
-                        <button id="btnRandomSeed" class="btn-icon" title="Roll New Track">🎲 ROLL TRACK</button>
-                    </div>
-                </div>
+            <div class="section-label" style="margin-top: 0.65rem;">Livery Finish</div>
+            <div class="color-palette">
+                <div class="color-dot active" data-color="00e5ff" style="background: #00e5ff;" title="Electric Cyan"></div>
+                <div class="color-dot" data-color="ff0055" style="background: #ff0055;" title="Neon Magenta"></div>
+                <div class="color-dot" data-color="ffd700" style="background: #ffd700;" title="Racing Gold"></div>
+                <div class="color-dot" data-color="00ff88" style="background: #00ff88;" title="Acid Green"></div>
+                <div class="color-dot" data-color="18191e" style="background: #18191e;" title="Obsidian Carbon"></div>
+            </div>
+        </div>
 
-                <!-- Steering Sensitivity Preference -->
-                <div style="margin-top: 0.6rem;">
-                    <div class="section-label" style="font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
-                        <span>STEERING SENSITIVITY</span>
-                        <span id="txtSensitivityMenu" style="color: #ffffff; font-weight: 700;">1.0x</span>
-                    </div>
-                    <input type="range" id="sliderSensitivityMenu" min="0.5" max="1.8" step="0.1" value="1.0" class="neon-slider" title="Adjust Turning Sharpness">
-                </div>
+        <!-- Bottom-Right Corner: Play / Start Race Launchpad -->
+        <div id="cornerPlayActions" class="glass-card menu-corner-card corner-bottom-right">
+            <div class="section-label">Race Launchpad</div>
+            <button id="btnStartSolo" class="btn-primary">START SOLO RACE (VS AI)</button>
+            <button id="btnStartSplit" class="btn-split" style="margin-top: 0.45rem;">⚡ 2-PLAYER SPLIT-SCREEN</button>
+            <div class="multiplayer-actions">
+                <button id="btnCreateRoom" class="btn-secondary">HOST ROOM</button>
+                <input type="text" id="roomCodeInput" class="neon-input" placeholder="CODE" style="max-width: 90px; padding: 0.35rem 0.5rem; font-size: 0.82rem;">
+                <button id="btnJoinRoom" class="btn-secondary">JOIN</button>
+            </div>
+            <div id="roomStatus" class="room-status"></div>
 
-                <div style="margin-top: 0.6rem;">
-                    <button id="btnStartSolo" class="btn-primary">START SOLO RACE (VS AI)</button>
-                    <button id="btnStartSplit" class="btn-split" style="margin-top: 0.5rem;">⚡ 2-PLAYER SPLIT-SCREEN</button>
-                    <div class="multiplayer-actions">
-                        <button id="btnCreateRoom" class="btn-secondary">HOST ROOM</button>
-                        <input type="text" id="roomCodeInput" class="neon-input" placeholder="CODE" style="max-width: 100px; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
-                        <button id="btnJoinRoom" class="btn-secondary">JOIN</button>
-                    </div>
-                    <div id="roomStatus" class="room-status"></div>
-                </div>
-
-                <div class="controls-hint">
-                    <strong>P1:</strong> WASD + ENTER (Accel) &bull; <strong>P2:</strong> ARROWS + SHIFT (Accel) &bull; <strong>R / P:</strong> Reset
-                </div>
+            <div class="controls-hint">
+                <strong>P1:</strong> WASD + ENTER &bull; <strong>P2:</strong> ARROWS + SHIFT &bull; <strong>R/P:</strong> RESET
             </div>
         </div>
     </div>
