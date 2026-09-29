@@ -9,13 +9,9 @@ export class GameRenderer {
         this.scene.background = new THREE.Color(0x0c1426);
         this.scene.fog = new THREE.FogExp2(0x0c1426, 0.0009);
 
-        // Camera 1 (Player 1 / Single Player)
+        // Cinematic Follow Camera
         const aspect = window.innerWidth / window.innerHeight;
         this.camera = new THREE.PerspectiveCamera(65, aspect, 0.2, 2500);
-
-        // Camera 2 (Player 2 for Local Split-Screen)
-        this.camera2 = new THREE.PerspectiveCamera(65, (window.innerWidth / 2) / window.innerHeight, 0.2, 2500);
-        this.isSplitScreen = false;
 
         // WebGL Renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -300,21 +296,6 @@ export class GameRenderer {
         this.camera.lookAt(lookTarget);
     }
 
-    snapCamera2(targetPhysics) {
-        if (!targetPhysics) return;
-        const carRoot = targetPhysics.root;
-        const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(carRoot.quaternion).normalize();
-        const carUp = new THREE.Vector3(0, 1, 0).applyQuaternion(carRoot.quaternion).normalize();
-        const idealCameraPos = carRoot.position.clone()
-            .addScaledVector(carForward, -this.cameraOffset.z)
-            .addScaledVector(carUp, this.cameraOffset.y);
-        this.camera2.position.copy(idealCameraPos);
-        const lookTarget = carRoot.position.clone()
-            .addScaledVector(carForward, this.cameraLookOffset.z)
-            .addScaledVector(carUp, this.cameraLookOffset.y);
-        this.camera2.lookAt(lookTarget);
-    }
-
     updateCamera(targetPhysics, dt) {
         if (!targetPhysics) return;
 
@@ -390,151 +371,15 @@ export class GameRenderer {
         }
     }
 
-    updateSplitCameras(p1Physics, p2Physics, dt) {
-        // Update particles (sparks & tire smoke)
-        this.updateSparks(dt);
-        this.updateTireSmoke(dt);
-
-        // --- Player 1 Camera (Left Viewport) ---
-        if (p1Physics) {
-            const car1 = p1Physics.root;
-            const speed1 = p1Physics.getSpeedKmh();
-            const targetFov1 = this.baseFov + (speed1 / 240) * 14 + (p1Physics.isNitro ? 10 : 0);
-            this.currentFov += (targetFov1 - this.currentFov) * 8 * dt;
-            this.camera.fov = this.currentFov;
-            this.camera.updateProjectionMatrix();
-
-            const fwd1 = new THREE.Vector3(0, 0, -1).applyQuaternion(car1.quaternion).normalize();
-            const up1 = new THREE.Vector3(0, 1, 0).applyQuaternion(car1.quaternion).normalize();
-
-            const idealPos1 = car1.position.clone()
-                .addScaledVector(fwd1, -this.cameraOffset.z)
-                .addScaledVector(up1, this.cameraOffset.y);
-
-            if (p1Physics.isDrifting || p1Physics.isNitro) {
-                const intens = p1Physics.isNitro ? 0.12 : 0.05;
-                idealPos1.x += (Math.random() - 0.5) * intens;
-                idealPos1.y += (Math.random() - 0.5) * intens;
-            }
-
-            this.camera.position.lerp(idealPos1, Math.min(1.0, 12 * dt));
-            const look1 = car1.position.clone()
-                .addScaledVector(fwd1, this.cameraLookOffset.z)
-                .addScaledVector(up1, this.cameraLookOffset.y);
-            this.camera.lookAt(look1);
-
-            const roll1 = -THREE.MathUtils.clamp((p1Physics.yawRate * 0.045 + p1Physics.steerAngle * 0.035), -0.06, 0.06);
-            this.currentCameraRoll += (roll1 - this.currentCameraRoll) * 6.0 * dt;
-            if (Math.abs(this.currentCameraRoll) > 0.0005) {
-                this.camera.rotateZ(this.currentCameraRoll);
-            }
-
-            // P1 Skidmarks & Tire Smoke
-            if (p1Physics.isDrifting && p1Physics.wheels && speed1 > 35) {
-                const rl = new THREE.Vector3();
-                p1Physics.wheels.rearLeft.getWorldPosition(rl);
-                const rr = new THREE.Vector3();
-                p1Physics.wheels.rearRight.getWorldPosition(rr);
-                this.emitTireSmoke(rl, 1);
-                this.emitTireSmoke(rr, 1);
-            }
-        }
-
-        // --- Player 2 Camera (Right Viewport) ---
-        if (p2Physics) {
-            const car2 = p2Physics.root;
-            const speed2 = p2Physics.getSpeedKmh();
-            const targetFov2 = this.baseFov + (speed2 / 240) * 14 + (p2Physics.isNitro ? 10 : 0);
-            this.currentFov2 += (targetFov2 - this.currentFov2) * 8 * dt;
-            this.camera2.fov = this.currentFov2;
-            this.camera2.updateProjectionMatrix();
-
-            const fwd2 = new THREE.Vector3(0, 0, -1).applyQuaternion(car2.quaternion).normalize();
-            const up2 = new THREE.Vector3(0, 1, 0).applyQuaternion(car2.quaternion).normalize();
-
-            const idealPos2 = car2.position.clone()
-                .addScaledVector(fwd2, -this.cameraOffset.z)
-                .addScaledVector(up2, this.cameraOffset.y);
-
-            if (p2Physics.isDrifting || p2Physics.isNitro) {
-                const intens2 = p2Physics.isNitro ? 0.12 : 0.05;
-                idealPos2.x += (Math.random() - 0.5) * intens2;
-                idealPos2.y += (Math.random() - 0.5) * intens2;
-            }
-
-            this.camera2.position.lerp(idealPos2, Math.min(1.0, 12 * dt));
-            const look2 = car2.position.clone()
-                .addScaledVector(fwd2, this.cameraLookOffset.z)
-                .addScaledVector(up2, this.cameraLookOffset.y);
-            this.camera2.lookAt(look2);
-
-            const roll2 = -THREE.MathUtils.clamp((p2Physics.yawRate * 0.045 + p2Physics.steerAngle * 0.035), -0.06, 0.06);
-            this.currentCamera2Roll += (roll2 - this.currentCamera2Roll) * 6.0 * dt;
-            if (Math.abs(this.currentCamera2Roll) > 0.0005) {
-                this.camera2.rotateZ(this.currentCamera2Roll);
-            }
-
-            // P2 Skidmarks & Tire Smoke
-            if (p2Physics.isDrifting && p2Physics.wheels && speed2 > 35) {
-                const rl = new THREE.Vector3();
-                p2Physics.wheels.rearLeft.getWorldPosition(rl);
-                const rr = new THREE.Vector3();
-                p2Physics.wheels.rearRight.getWorldPosition(rr);
-                this.emitTireSmoke(rl, 1);
-                this.emitTireSmoke(rr, 1);
-            }
-        }
-
-        // Center shadow frustum at midpoint between cars
-        if (p1Physics && p2Physics) {
-            this.dirLight.position.x = (p1Physics.root.position.x + p2Physics.root.position.x) * 0.5 + 100;
-            this.dirLight.position.z = (p1Physics.root.position.z + p2Physics.root.position.z) * 0.5 + 100;
-        }
-    }
-
     render() {
-        if (!this.isSplitScreen) {
-            this.renderer.setScissorTest(false);
-            this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-            this.renderer.render(this.scene, this.camera);
-        } else {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            const halfW = Math.floor(width / 2);
-
-            this.renderer.setScissorTest(true);
-
-            // Left Screen: Player 1
-            this.renderer.setViewport(0, 0, halfW, height);
-            this.renderer.setScissor(0, 0, halfW, height);
-            this.camera.aspect = halfW / height;
-            this.camera.updateProjectionMatrix();
-            this.renderer.render(this.scene, this.camera);
-
-            // Right Screen: Player 2
-            this.renderer.setViewport(halfW, 0, width - halfW, height);
-            this.renderer.setScissor(halfW, 0, width - halfW, height);
-            this.camera2.aspect = (width - halfW) / height;
-            this.camera2.updateProjectionMatrix();
-            this.renderer.render(this.scene, this.camera2);
-
-            this.renderer.setScissorTest(false);
-        }
+        this.renderer.render(this.scene, this.camera);
     }
 
     onResize() {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        if (!this.isSplitScreen) {
-            this.camera.aspect = width / height;
-            this.camera.updateProjectionMatrix();
-        } else {
-            const halfW = Math.floor(width / 2);
-            this.camera.aspect = halfW / height;
-            this.camera.updateProjectionMatrix();
-            this.camera2.aspect = (width - halfW) / height;
-            this.camera2.updateProjectionMatrix();
-        }
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
     }
 }

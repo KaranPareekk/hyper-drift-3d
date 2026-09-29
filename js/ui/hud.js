@@ -60,29 +60,6 @@ export class HUD {
 
         this.hudScreen = document.getElementById('hudScreen');
         this.bannerTimeout = null;
-
-        // Split-Screen Elements
-        this.p1Pos = document.getElementById('p1Pos');
-        this.p1Lap = document.getElementById('p1Lap');
-        this.p1Speed = document.getElementById('p1Speed');
-        this.p1Gear = document.getElementById('p1Gear');
-        this.p1NitroBar = document.getElementById('p1NitroBar');
-
-        this.p2Pos = document.getElementById('p2Pos');
-        this.p2Lap = document.getElementById('p2Lap');
-        this.p2Speed = document.getElementById('p2Speed');
-        this.p2Gear = document.getElementById('p2Gear');
-        this.p2NitroBar = document.getElementById('p2NitroBar');
-    }
-
-    setSplitScreenMode(enabled) {
-        if (this.hudScreen) {
-            if (enabled) {
-                this.hudScreen.classList.add('split-mode');
-            } else {
-                this.hudScreen.classList.remove('split-mode');
-            }
-        }
     }
 
     update(physics, opponents = [], track = null) {
@@ -190,64 +167,116 @@ export class HUD {
     }
 
     drawMinimap(track, playerPhys, opponents) {
+        if (!this.minimapCtx || !this.minimapCanvas) return;
         const ctx = this.minimapCtx;
         const w = this.minimapCanvas.width;
         const h = this.minimapCanvas.height;
 
         ctx.clearRect(0, 0, w, h);
 
-        // Find bounding box of track
         const pts = track.trackPoints;
         if (!pts || pts.length === 0) return;
 
-        // Auto scale to fit minimap
-        const scale = 0.22;
-        const centerX = w * 0.5;
-        const centerY = h * 0.5;
+        // Auto-compute bounding box once per track or when track changes
+        if (!this.minimapBounds || this.minimapBounds.trackRef !== track) {
+            let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+            for (let i = 0; i < pts.length; i += 2) {
+                const p = pts[i];
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.z < minZ) minZ = p.z;
+                if (p.z > maxZ) maxZ = p.z;
+            }
+            const trackW = Math.max(10, maxX - minX);
+            const trackH = Math.max(10, maxZ - minZ);
+            const padding = 18;
+            const availW = w - padding * 2;
+            const availH = h - padding * 2;
+            const scale = Math.min(availW / trackW, availH / trackH);
+            const midX = (minX + maxX) * 0.5;
+            const midZ = (minZ + maxZ) * 0.5;
+            this.minimapBounds = { trackRef: track, scale, midX, midZ };
+        }
 
-        // Draw track curve
+        const { scale, midX, midZ } = this.minimapBounds;
+        const cx = w * 0.5;
+        const cy = h * 0.5;
+
+        const toScreenX = (wx) => cx + (wx - midX) * scale;
+        const toScreenY = (wz) => cy + (wz - midZ) * scale;
+
+        // Draw track outline glow
+        ctx.save();
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        for (let i = 0; i < pts.length; i += 4) {
-            const px = centerX + pts[i].x * scale;
-            const pz = centerY + pts[i].z * scale;
-            if (i === 0) ctx.moveTo(px, pz);
-            else ctx.lineTo(px, pz);
+        for (let i = 0; i < pts.length; i += 3) {
+            const sx = toScreenX(pts[i].x);
+            const sy = toScreenY(pts[i].z);
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
         }
         ctx.closePath();
+
+        // Neon track circuit
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.65)';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = 'rgba(0, 240, 255, 0.7)';
+        ctx.shadowBlur = 6;
         ctx.stroke();
 
-        // Draw opponents
-        opponents.forEach(opp => {
-            const pos = opp.physics.root.position;
-            const ox = centerX + pos.x * scale;
-            const oz = centerY + pos.z * scale;
-            ctx.fillStyle = '#ff0055';
+        // Start/Finish Line Indicator
+        if (pts.length > 0) {
+            const startX = toScreenX(pts[0].x);
+            const startY = toScreenY(pts[0].z);
+            ctx.fillStyle = '#ffea00';
+            ctx.shadowColor = '#ffea00';
+            ctx.shadowBlur = 5;
             ctx.beginPath();
-            ctx.arc(ox, oz, 4, 0, Math.PI * 2);
+            ctx.arc(startX, startY, 3.5, 0, Math.PI * 2);
             ctx.fill();
+        }
+        ctx.restore();
+
+        // Draw AI Opponents (crimson pulsing blips)
+        opponents.forEach(opp => {
+            if (!opp.physics || !opp.physics.root) return;
+            const pos = opp.physics.root.position;
+            const ox = toScreenX(pos.x);
+            const oz = toScreenY(pos.z);
+
+            ctx.save();
+            ctx.fillStyle = '#ff1155';
+            ctx.shadowColor = '#ff0044';
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(ox, oz, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         });
 
-        // Draw player marker (bright cyan triangle with heading)
+        // Draw Player Marker (vivid cyan directional arrowhead aligned to car world orientation)
         const pPos = playerPhys.root.position;
-        const px = centerX + pPos.x * scale;
-        const pz = centerY + pPos.z * scale;
+        const px = toScreenX(pPos.x);
+        const pz = toScreenY(pPos.z);
+
+        // Derive car forward vector in 3D world space
+        const fwdX = -Math.sin(playerPhys.root.rotation.y || 0);
+        const fwdZ = -Math.cos(playerPhys.root.rotation.y || 0);
+        const headingAngle = Math.atan2(fwdZ, fwdX) + Math.PI / 2;
 
         ctx.save();
         ctx.translate(px, pz);
-        ctx.rotate(-playerPhys.heading);
+        ctx.rotate(headingAngle);
 
         ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00f7ff';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.moveTo(0, -6);
-        ctx.lineTo(4, 5);
-        ctx.lineTo(-4, 5);
+        ctx.moveTo(0, -7);
+        ctx.lineTo(4.5, 5);
+        ctx.lineTo(0, 3);
+        ctx.lineTo(-4.5, 5);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -262,105 +291,6 @@ export class HUD {
         this.bannerTimeout = setTimeout(() => {
             this.banner.classList.remove('visible');
         }, duration);
-    }
-
-    updateSplit(p1Physics, p2Physics, track = null) {
-        if (!p1Physics || !p2Physics) return;
-
-        // --- Player 1 Telemetry ---
-        const speed1 = p1Physics.getSpeedKmh();
-        if (this.p1Speed) this.p1Speed.innerText = speed1;
-        if (this.p1Gear) this.p1Gear.innerText = p1Physics.gear;
-        if (this.p1Lap) this.p1Lap.innerText = `${Math.min(3, p1Physics.currentLap)}/3`;
-        if (this.p1NitroBar) {
-            this.p1NitroBar.style.width = `${p1Physics.nitro}%`;
-        }
-
-        // --- Player 2 Telemetry ---
-        const speed2 = p2Physics.getSpeedKmh();
-        if (this.p2Speed) this.p2Speed.innerText = speed2;
-        if (this.p2Gear) this.p2Gear.innerText = p2Physics.gear;
-        if (this.p2Lap) this.p2Lap.innerText = `${Math.min(3, p2Physics.currentLap)}/3`;
-        if (this.p2NitroBar) {
-            this.p2NitroBar.style.width = `${p2Physics.nitro}%`;
-        }
-
-        // Calculate dynamic relative race ranking
-        if (this.p1Pos && this.p2Pos && track) {
-            const p1Prog = (p1Physics.currentLap - 1) + p1Physics.checkpointProgress;
-            const p2Prog = (p2Physics.currentLap - 1) + p2Physics.checkpointProgress;
-
-            if (p1Prog >= p2Prog) {
-                this.p1Pos.innerText = "1ST";
-                this.p1Pos.style.color = "#00f0ff";
-                this.p2Pos.innerText = "2ND";
-                this.p2Pos.style.color = "#ff88aa";
-            } else {
-                this.p1Pos.innerText = "2ND";
-                this.p1Pos.style.color = "#8fa0c0";
-                this.p2Pos.innerText = "1ST";
-                this.p2Pos.style.color = "#ff0055";
-            }
-        }
-
-        // Draw split speed lines for P1 and P2
-        this.drawSplitSpeedLines(p1Physics, p2Physics);
-    }
-
-    drawSplitSpeedLines(p1Physics, p2Physics) {
-        if (!this.speedLinesCtx || !this.speedLinesCanvas) return;
-        const ctx = this.speedLinesCtx;
-        const w = this.speedLinesCanvas.width;
-        const h = this.speedLinesCanvas.height;
-        const halfW = w * 0.5;
-
-        const p1Active = p1Physics && (p1Physics.getSpeedKmh() > 165 || p1Physics.isNitro);
-        const p2Active = p2Physics && (p2Physics.getSpeedKmh() > 165 || p2Physics.isNitro);
-
-        if (!p1Active && !p2Active) {
-            if (this.speedLinesCanvas.style.opacity !== '0') {
-                this.speedLinesCanvas.style.opacity = '0';
-                ctx.clearRect(0, 0, w, h);
-            }
-            return;
-        }
-
-        this.speedLinesCanvas.style.opacity = '1';
-        ctx.clearRect(0, 0, w, h);
-
-        if (p1Active) {
-            const cx1 = halfW * 0.5;
-            const cy1 = h * 0.48;
-            const num = p1Physics.isNitro ? 20 : 12;
-            ctx.strokeStyle = p1Physics.isNitro ? 'rgba(0, 240, 255, 0.45)' : 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1.8;
-            for (let i = 0; i < num; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const innerR = Math.min(halfW, h) * (0.28 + Math.random() * 0.20);
-                const outerR = Math.min(halfW, h) * (0.55 + Math.random() * 0.35);
-                ctx.beginPath();
-                ctx.moveTo(cx1 + Math.cos(angle) * innerR, cy1 + Math.sin(angle) * innerR);
-                ctx.lineTo(cx1 + Math.cos(angle) * outerR, cy1 + Math.sin(angle) * outerR);
-                ctx.stroke();
-            }
-        }
-
-        if (p2Active) {
-            const cx2 = halfW + halfW * 0.5;
-            const cy2 = h * 0.48;
-            const num = p2Physics.isNitro ? 20 : 12;
-            ctx.strokeStyle = p2Physics.isNitro ? 'rgba(255, 0, 85, 0.45)' : 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1.8;
-            for (let i = 0; i < num; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const innerR = Math.min(halfW, h) * (0.28 + Math.random() * 0.20);
-                const outerR = Math.min(halfW, h) * (0.55 + Math.random() * 0.35);
-                ctx.beginPath();
-                ctx.moveTo(cx2 + Math.cos(angle) * innerR, cy2 + Math.sin(angle) * innerR);
-                ctx.lineTo(cx2 + Math.cos(angle) * outerR, cy2 + Math.sin(angle) * outerR);
-                ctx.stroke();
-            }
-        }
     }
 
     formatTime(sec) {

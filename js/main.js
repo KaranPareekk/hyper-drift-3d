@@ -33,9 +33,6 @@ class Game {
         this.scenery = null;
         this.playerCar = null;
         this.playerPhysics = null;
-        this.player2Car = null;
-        this.player2Physics = null;
-        this.isSplitScreen = false;
         this.aiRivals = [];
 
         // Showroom turntable car
@@ -148,15 +145,6 @@ class Game {
     }
 
     startRace(isMultiplayer = false) {
-        this.isSplitScreen = false;
-        this.renderer.isSplitScreen = false;
-        this.hud.setSplitScreenMode(false);
-        if (this.player2Car) {
-            this.scene.remove(this.player2Car.root);
-            this.player2Car = null;
-            this.player2Physics = null;
-        }
-
         // Remove showroom car & turntable
         if (this.showroomCar) {
             this.scene.remove(this.showroomCar.root);
@@ -165,6 +153,13 @@ class Game {
         if (this.showroomTurntable) {
             this.scene.remove(this.showroomTurntable);
             this.showroomTurntable = null;
+        }
+
+        // Clean up any old player car
+        if (this.playerCar) {
+            this.scene.remove(this.playerCar.root);
+            this.playerCar = null;
+            this.playerPhysics = null;
         }
 
         // Build procedural track if not already built
@@ -218,84 +213,6 @@ class Game {
         this.startCountdown();
     }
 
-    startSplitScreenRace() {
-        this.isSplitScreen = true;
-        this.renderer.isSplitScreen = true;
-        this.hud.setSplitScreenMode(true);
-
-        // Remove showroom car & turntable
-        if (this.showroomCar) {
-            this.scene.remove(this.showroomCar.root);
-            this.showroomCar = null;
-        }
-        if (this.showroomTurntable) {
-            this.scene.remove(this.showroomTurntable);
-            this.showroomTurntable = null;
-        }
-
-        // Clean up previous cars
-        if (this.playerCar) {
-            this.scene.remove(this.playerCar.root);
-            this.playerCar = null;
-            this.playerPhysics = null;
-        }
-        if (this.player2Car) {
-            this.scene.remove(this.player2Car.root);
-            this.player2Car = null;
-            this.player2Physics = null;
-        }
-
-        // Build procedural track
-        this.loadTrack(this.trackSeed);
-
-        // --- Spawn Player 1 (Slot 0 - Left pole position) ---
-        this.playerCar = this.carBuilder.createCar(this.selectedCarType, this.selectedCarColor);
-        this.scene.add(this.playerCar.root);
-        this.playerPhysics = new VehiclePhysics(this.playerCar, { type: this.selectedCarType });
-        this.playerPhysics.steeringSensitivity = this.selectedSensitivity || 1.0;
-
-        const spawn1 = this.track.getSpawnTransform(0);
-        this.playerPhysics.root.position.copy(spawn1.position);
-        this.playerPhysics.carHeadingAngle = 0;
-        this.playerPhysics.vLong = 0;
-        this.playerPhysics.vLat = 0;
-        this.playerPhysics.yawRate = 0;
-        this.playerPhysics.alignOrientationWithTrack(this.track.getRoadSurfaceAt(spawn1.position));
-
-        // --- Spawn Player 2 (Slot 1 - Right position beside P1) ---
-        const p2Type = (this.selectedCarType === 'apex') ? 'vortex' : 'apex';
-        const p2Color = (this.selectedCarColor === 0xff0055) ? 0x00e5ff : 0xff0055;
-        this.player2Car = this.carBuilder.createCar(p2Type, p2Color);
-        this.scene.add(this.player2Car.root);
-        this.player2Physics = new VehiclePhysics(this.player2Car, { type: p2Type });
-        this.player2Physics.steeringSensitivity = this.selectedSensitivity || 1.0;
-
-        const spawn2 = this.track.getSpawnTransform(1);
-        this.player2Physics.root.position.copy(spawn2.position);
-        this.player2Physics.carHeadingAngle = 0;
-        this.player2Physics.vLong = 0;
-        this.player2Physics.vLat = 0;
-        this.player2Physics.yawRate = 0;
-        this.player2Physics.alignOrientationWithTrack(this.track.getRoadSurfaceAt(spawn2.position));
-
-        // Snap both cameras
-        this.renderer.snapCamera(this.playerPhysics);
-        this.renderer.snapCamera2(this.player2Physics);
-
-        // 1v1 Local Split-Screen duel (no AI rivals)
-        this.aiRivals = [];
-
-        // Clear stale inputs and focus window
-        this.clearInputs();
-        if (document.activeElement && typeof document.activeElement.blur === 'function') {
-            document.activeElement.blur();
-        }
-        window.focus();
-
-        // Start countdown
-        this.startCountdown();
-    }
-
     startCountdown() {
         this.gameState = 'COUNTDOWN';
         let count = 3;
@@ -331,14 +248,6 @@ class Game {
             this.playerPhysics.input.nitro = false;
             this.playerPhysics.input.handbrake = false;
         }
-        if (this.player2Physics) {
-            this.player2Physics.input.left = 0;
-            this.player2Physics.input.right = 0;
-            this.player2Physics.input.forward = 0;
-            this.player2Physics.input.backward = 0;
-            this.player2Physics.input.nitro = false;
-            this.player2Physics.input.handbrake = false;
-        }
     }
 
     setupInputs() {
@@ -361,9 +270,8 @@ class Game {
                 code === 'KeyD' || key === 'd' ||
                 code === 'KeyQ' || key === 'q' ||
                 code === 'KeyE' || key === 'e' ||
-                code === 'KeyP' || key === 'p' ||
                 code === 'KeyR' || key === 'r' ||
-                ((code === 'Enter' || code === 'NumpadEnter' || key === 'enter') && (this.gameState === 'RACING' || this.gameState === 'COUNTDOWN' || this.isSplitScreen))) {
+                ((code === 'Enter' || code === 'NumpadEnter' || key === 'enter') && (this.gameState === 'RACING' || this.gameState === 'COUNTDOWN'))) {
                 e.preventDefault();
             }
 
@@ -382,12 +290,9 @@ class Game {
                 this.keys['which_' + e.which] = true;
             }
 
-            // Reset car keys ('R' for P1, 'P' for P2 in split-screen)
+            // Reset car key ('R')
             if ((code === 'KeyR' || key === 'r' || e.keyCode === 82) && this.gameState === 'RACING') {
                 this.resetPlayerToTrack();
-            }
-            if ((code === 'KeyP' || key === 'p' || e.keyCode === 80) && this.isSplitScreen && this.gameState === 'RACING') {
-                this.resetPlayer2ToTrack();
             }
 
             // Audio init on user gesture
@@ -489,107 +394,50 @@ class Game {
         if (!this.playerPhysics) return;
 
         if (this.gameState === 'RACING') {
-            if (!this.isSplitScreen) {
-                // --- SINGLE PLAYER / ONLINE MULTIPLAYER (Full multi-layout support) ---
-                const isW = Boolean(
-                    this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || this.keys[87] || this.keys['keyCode_87'] ||
-                    this.keys['Enter'] || this.keys['NumpadEnter'] || this.keys['enter'] || this.keys[13] || this.keys['keyCode_13'] ||
-                    this.keys['ArrowUp'] || this.keys['Up'] || this.keys[38] || this.keys['keyCode_38'] ||
-                    this.keys['Numpad8']
-                );
-                const isS = Boolean(
-                    this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || this.keys[83] || this.keys['keyCode_83'] ||
-                    this.keys['ArrowDown'] || this.keys['Down'] || this.keys[40] || this.keys['keyCode_40'] ||
-                    this.keys['Numpad2'] || this.keys['Numpad5']
-                );
-                const isA = Boolean(
-                    this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys[65] || this.keys['keyCode_65'] ||
-                    this.keys['ArrowLeft'] || this.keys['Left'] || this.keys[37] || this.keys['keyCode_37'] ||
-                    this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || this.keys[81] || this.keys['keyCode_81'] ||
-                    this.keys['Numpad4'] || this.touchSteerLeft
-                );
-                const isD = Boolean(
-                    this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || this.keys[68] || this.keys['keyCode_68'] ||
-                    this.keys['ArrowRight'] || this.keys['Right'] || this.keys[39] || this.keys['keyCode_39'] ||
-                    this.keys['Numpad6'] || this.touchSteerRight
-                );
-                const isBoost = Boolean(
-                    this.keys['Space'] || this.keys[' '] || this.keys[32] || this.keys['keyCode_32'] ||
-                    this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || this.keys[16] || this.keys['keyCode_16'] ||
-                    this.keys['KeyE'] || this.keys['e'] || this.keys['E'] || this.keys[69] || this.keys['keyCode_69']
-                );
+            // Full multi-layout keyboard & on-screen support
+            const isW = Boolean(
+                this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || this.keys[87] || this.keys['keyCode_87'] ||
+                this.keys['Enter'] || this.keys['NumpadEnter'] || this.keys['enter'] || this.keys[13] || this.keys['keyCode_13'] ||
+                this.keys['ArrowUp'] || this.keys['Up'] || this.keys[38] || this.keys['keyCode_38'] ||
+                this.keys['Numpad8']
+            );
+            const isS = Boolean(
+                this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || this.keys[83] || this.keys['keyCode_83'] ||
+                this.keys['ArrowDown'] || this.keys['Down'] || this.keys[40] || this.keys['keyCode_40'] ||
+                this.keys['Numpad2'] || this.keys['Numpad5']
+            );
+            const isA = Boolean(
+                this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys[65] || this.keys['keyCode_65'] ||
+                this.keys['ArrowLeft'] || this.keys['Left'] || this.keys[37] || this.keys['keyCode_37'] ||
+                this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || this.keys[81] || this.keys['keyCode_81'] ||
+                this.keys['Numpad4'] || this.touchSteerLeft
+            );
+            const isD = Boolean(
+                this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || this.keys[68] || this.keys['keyCode_68'] ||
+                this.keys['ArrowRight'] || this.keys['Right'] || this.keys[39] || this.keys['keyCode_39'] ||
+                this.keys['Numpad6'] || this.touchSteerRight
+            );
+            const isBoost = Boolean(
+                this.keys['Space'] || this.keys[' '] || this.keys[32] || this.keys['keyCode_32'] ||
+                this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || this.keys[16] || this.keys['keyCode_16'] ||
+                this.keys['KeyE'] || this.keys['e'] || this.keys['E'] || this.keys[69] || this.keys['keyCode_69']
+            );
 
-                this.playerPhysics.input.forward = isW ? 1 : 0;
-                this.playerPhysics.input.backward = isS ? 1 : 0;
-                this.playerPhysics.input.left = isA ? 1 : 0;
-                this.playerPhysics.input.right = isD ? 1 : 0;
-                this.playerPhysics.input.nitro = isBoost;
-                this.playerPhysics.input.handbrake = false;
+            this.playerPhysics.input.forward = isW ? 1 : 0;
+            this.playerPhysics.input.backward = isS ? 1 : 0;
+            this.playerPhysics.input.left = isA ? 1 : 0;
+            this.playerPhysics.input.right = isD ? 1 : 0;
+            this.playerPhysics.input.nitro = isBoost;
+            this.playerPhysics.input.handbrake = false;
 
-                // Reflect visual active glow on side controls for instant confirmation
-                if (this.btnTouchLeft) {
-                    if (isA) this.btnTouchLeft.classList.add('active');
-                    else this.btnTouchLeft.classList.remove('active');
-                }
-                if (this.btnTouchRight) {
-                    if (isD) this.btnTouchRight.classList.add('active');
-                    else this.btnTouchRight.classList.remove('active');
-                }
-            } else {
-                // --- 2-PLAYER LOCAL SPLIT-SCREEN (Strictly Decoupled) ---
-                // PLAYER 1 (Left Screen): WASD for steering/reverse + ENTER for acceleration
-                const p1SteerLeft = Boolean(
-                    this.keys['KeyA'] || this.keys['a'] || this.keys['A'] || this.keys[65] || this.keys['keyCode_65'] ||
-                    this.keys['KeyQ'] || this.keys['q'] || this.keys['Q'] || this.keys[81] || this.keys['keyCode_81']
-                );
-                const p1SteerRight = Boolean(
-                    this.keys['KeyD'] || this.keys['d'] || this.keys['D'] || this.keys[68] || this.keys['keyCode_68']
-                );
-                const p1Reverse = Boolean(
-                    this.keys['KeyS'] || this.keys['s'] || this.keys['S'] || this.keys[83] || this.keys['keyCode_83']
-                );
-                const p1Accelerate = Boolean(
-                    this.keys['Enter'] || this.keys['enter'] || this.keys['NumpadEnter'] || this.keys[13] || this.keys['keyCode_13'] ||
-                    this.keys['KeyW'] || this.keys['w'] || this.keys['W'] || this.keys[87] || this.keys['keyCode_87']
-                );
-                const p1Boost = Boolean(
-                    this.keys['KeyE'] || this.keys['e'] || this.keys['E'] || this.keys[69] || this.keys['keyCode_69'] ||
-                    this.keys['Space'] || this.keys[' '] || this.keys[32] || this.keys['keyCode_32']
-                );
-
-                this.playerPhysics.input.forward = p1Accelerate ? 1 : 0;
-                this.playerPhysics.input.backward = p1Reverse ? 1 : 0;
-                this.playerPhysics.input.left = p1SteerLeft ? 1 : 0;
-                this.playerPhysics.input.right = p1SteerRight ? 1 : 0;
-                this.playerPhysics.input.nitro = p1Boost;
-                this.playerPhysics.input.handbrake = false;
-
-                // PLAYER 2 (Right Screen): Arrow keys for steering/reverse + SHIFT for acceleration
-                if (this.player2Physics) {
-                    const p2SteerLeft = Boolean(
-                        this.keys['ArrowLeft'] || this.keys['Left'] || this.keys[37] || this.keys['keyCode_37']
-                    );
-                    const p2SteerRight = Boolean(
-                        this.keys['ArrowRight'] || this.keys['Right'] || this.keys[39] || this.keys['keyCode_39']
-                    );
-                    const p2Reverse = Boolean(
-                        this.keys['ArrowDown'] || this.keys['Down'] || this.keys[40] || this.keys['keyCode_40']
-                    );
-                    const p2Accelerate = Boolean(
-                        this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Shift'] || this.keys[16] || this.keys['keyCode_16'] ||
-                        this.keys['ArrowUp'] || this.keys['Up'] || this.keys[38] || this.keys['keyCode_38']
-                    );
-                    const p2Boost = Boolean(
-                        this.keys['Numpad0'] || this.keys[96] || this.keys['ControlRight'] || this.keys['ControlLeft'] || this.keys[17]
-                    );
-
-                    this.player2Physics.input.forward = p2Accelerate ? 1 : 0;
-                    this.player2Physics.input.backward = p2Reverse ? 1 : 0;
-                    this.player2Physics.input.left = p2SteerLeft ? 1 : 0;
-                    this.player2Physics.input.right = p2SteerRight ? 1 : 0;
-                    this.player2Physics.input.nitro = p2Boost;
-                    this.player2Physics.input.handbrake = false;
-                }
+            // Reflect visual active glow on side controls for instant confirmation
+            if (this.btnTouchLeft) {
+                if (isA) this.btnTouchLeft.classList.add('active');
+                else this.btnTouchLeft.classList.remove('active');
+            }
+            if (this.btnTouchRight) {
+                if (isD) this.btnTouchRight.classList.add('active');
+                else this.btnTouchRight.classList.remove('active');
             }
         } else {
             // Locked during countdown
@@ -599,15 +447,6 @@ class Game {
             this.playerPhysics.input.right = 0;
             this.playerPhysics.input.handbrake = false;
             this.playerPhysics.input.nitro = false;
-
-            if (this.player2Physics) {
-                this.player2Physics.input.forward = 0;
-                this.player2Physics.input.backward = 0;
-                this.player2Physics.input.left = 0;
-                this.player2Physics.input.right = 0;
-                this.player2Physics.input.handbrake = false;
-                this.player2Physics.input.nitro = false;
-            }
 
             if (this.btnTouchLeft) this.btnTouchLeft.classList.remove('active');
             if (this.btnTouchRight) this.btnTouchRight.classList.remove('active');
@@ -624,20 +463,7 @@ class Game {
         this.playerPhysics.yawRate = 0;
         this.playerPhysics.steerAngle = 0;
         this.playerPhysics.alignOrientationWithTrack(trackInfo);
-        this.hud.showBanner(this.isSplitScreen ? "P1 RESET" : "CAR RESET", 1000);
-    }
-
-    resetPlayer2ToTrack() {
-        if (!this.player2Physics || !this.track) return;
-        const trackInfo = this.track.getRoadSurfaceAt(this.player2Physics.root.position);
-        this.player2Physics.root.position.copy(trackInfo.surfacePoint);
-        this.player2Physics.carHeadingAngle = 0;
-        this.player2Physics.vLong = 0;
-        this.player2Physics.vLat = 0;
-        this.player2Physics.yawRate = 0;
-        this.player2Physics.steerAngle = 0;
-        this.player2Physics.alignOrientationWithTrack(trackInfo);
-        this.hud.showBanner("P2 RESET", 1000);
+        this.hud.showBanner("CAR RESET", 1000);
     }
 
     animate() {
@@ -657,169 +483,80 @@ class Game {
             // Update inputs
             this.updatePlayerInputs();
 
-            if (!this.isSplitScreen) {
-                // --- SINGLE PLAYER / ONLINE MULTIPLAYER LOOP ---
-                if (this.playerPhysics) {
-                    this.playerPhysics.update(dt, this.track);
+            // --- RACE SIMULATION LOOP ---
+            if (this.playerPhysics) {
+                this.playerPhysics.update(dt, this.track);
 
-                    // Update sound engine
-                    const rpmRatio = (this.playerPhysics.rpm - 1000) / 7000;
-                    const throttle = this.playerPhysics.input.forward;
-                    const speedKmh = this.playerPhysics.getSpeedKmh();
-                    const speedRatio = speedKmh / 240;
-                    this.sound.updateEngine(rpmRatio, throttle, speedRatio);
-                    this.sound.updateDrift(this.playerPhysics.isDrifting ? Math.abs(this.playerPhysics.driftAngle) : 0);
-                    this.sound.setNitro(this.playerPhysics.isNitro);
-                    this.sound.updateWind(speedKmh);
+                // Update sound engine
+                const rpmRatio = (this.playerPhysics.rpm - 1000) / 7000;
+                const throttle = this.playerPhysics.input.forward;
+                const speedKmh = this.playerPhysics.getSpeedKmh();
+                const speedRatio = speedKmh / 240;
+                this.sound.updateEngine(rpmRatio, throttle, speedRatio);
+                this.sound.updateDrift(this.playerPhysics.isDrifting ? Math.abs(this.playerPhysics.driftAngle) : 0);
+                this.sound.setNitro(this.playerPhysics.isNitro);
+                this.sound.updateWind(speedKmh);
 
-                    if (this.playerPhysics.justHitBarrier) {
-                        this.sound.playBarrierImpact(this.playerPhysics.impactSeverity || 0.6);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.playerPhysics.root.position, 16);
-                        }
-                        this.playerPhysics.justHitBarrier = false;
+                if (this.playerPhysics.justHitBarrier) {
+                    this.sound.playBarrierImpact(this.playerPhysics.impactSeverity || 0.6);
+                    this.sound.playSparkSound();
+                    if (this.renderer && this.renderer.emitSparks) {
+                        this.renderer.emitSparks(this.playerPhysics.root.position, 16);
                     }
-
-                    if (this.playerPhysics.justHitObstacle) {
-                        this.sound.playBarrierImpact(0.85);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.playerPhysics.root.position, 28);
-                        }
-                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.45);
-                        this.hud.showBanner("HAZARD COLLISION! 💥", 900);
-                        this.playerPhysics.justHitObstacle = false;
-                    }
-
-                    if (this.playerPhysics.justHitBoostPad) {
-                        this.sound.playBoostPad();
-                        this.hud.showBanner("BOOST PAD! ⚡", 1100);
-                        this.playerPhysics.justHitBoostPad = false;
-                    }
-
-                    // Update Camera & sparks
-                    this.renderer.updateCamera(this.playerPhysics, dt);
-
-                    // Check finish condition (3 laps)
-                    if (this.playerPhysics.currentLap > 3 && this.gameState === 'RACING') {
-                        this.gameState = 'FINISHED';
-                        this.hud.showBanner("RACE COMPLETE! 🏆", 5000);
-                    }
+                    this.playerPhysics.justHitBarrier = false;
                 }
 
-                // Update dynamic track props (kinetic hazard spheres, gates)
-                if (this.track && typeof this.track.update === 'function') {
-                    this.track.update(dt);
+                if (this.playerPhysics.justHitObstacle) {
+                    this.sound.playBarrierImpact(0.85);
+                    this.sound.playSparkSound();
+                    if (this.renderer && this.renderer.emitSparks) {
+                        this.renderer.emitSparks(this.playerPhysics.root.position, 28);
+                    }
+                    this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.45);
+                    this.hud.showBanner("HAZARD COLLISION! 💥", 900);
+                    this.playerPhysics.justHitObstacle = false;
                 }
 
-                // Update AI Rivals
-                this.aiRivals.forEach(ai => ai.update(dt));
-
-                // Update Multiplayer remote players
-                this.multiplayer.update(dt);
-
-                // Update scenery animations (particles, pulsating signs)
-                if (this.scenery) {
-                    this.scenery.update(dt);
+                if (this.playerPhysics.justHitBoostPad) {
+                    this.sound.playBoostPad();
+                    this.hud.showBanner("BOOST PAD! ⚡", 1100);
+                    this.playerPhysics.justHitBoostPad = false;
                 }
 
-                // Update HUD
-                this.hud.update(this.playerPhysics, this.aiRivals, this.track);
-            } else {
-                // --- 2-PLAYER LOCAL SPLIT-SCREEN LOOP ---
-                if (this.playerPhysics && this.player2Physics) {
-                    this.playerPhysics.update(dt, this.track);
-                    this.player2Physics.update(dt, this.track);
-
-                    // Composite sound for dual local players
-                    const speed1 = this.playerPhysics.getSpeedKmh();
-                    const speed2 = this.player2Physics.getSpeedKmh();
-                    const maxRpmRatio = Math.max((this.playerPhysics.rpm - 1000) / 7000, (this.player2Physics.rpm - 1000) / 7000);
-                    const maxThrottle = Math.max(this.playerPhysics.input.forward, this.player2Physics.input.forward);
-                    const maxSpeed = Math.max(speed1, speed2);
-
-                    this.sound.updateEngine(maxRpmRatio, maxThrottle, maxSpeed / 240);
-                    this.sound.updateWind(maxSpeed);
-                    this.sound.setNitro(this.playerPhysics.isNitro || this.player2Physics.isNitro);
-
-                    // Player 1 events
-                    if (this.playerPhysics.justHitBarrier) {
-                        this.sound.playBarrierImpact(0.6);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.playerPhysics.root.position, 14);
-                        }
-                        this.playerPhysics.justHitBarrier = false;
-                    }
-                    if (this.playerPhysics.justHitObstacle) {
-                        this.sound.playBarrierImpact(0.85);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.playerPhysics.root.position, 22);
-                        }
-                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.40);
-                        this.hud.showBanner("P1 HAZARD HIT! 💥", 900);
-                        this.playerPhysics.justHitObstacle = false;
-                    }
-                    if (this.playerPhysics.justHitBoostPad) {
-                        this.sound.playBoostPad();
-                        this.hud.showBanner("P1 BOOST PAD! ⚡", 1000);
-                        this.playerPhysics.justHitBoostPad = false;
-                    }
-
-                    // Player 2 events
-                    if (this.player2Physics.justHitBarrier) {
-                        this.sound.playBarrierImpact(0.6);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.player2Physics.root.position, 14);
-                        }
-                        this.player2Physics.justHitBarrier = false;
-                    }
-                    if (this.player2Physics.justHitObstacle) {
-                        this.sound.playBarrierImpact(0.85);
-                        this.sound.playSparkSound();
-                        if (this.renderer && this.renderer.emitSparks) {
-                            this.renderer.emitSparks(this.player2Physics.root.position, 22);
-                        }
-                        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.40);
-                        this.hud.showBanner("P2 HAZARD HIT! 💥", 900);
-                        this.player2Physics.justHitObstacle = false;
-                    }
-                    if (this.player2Physics.justHitBoostPad) {
-                        this.sound.playBoostPad();
-                        this.hud.showBanner("P2 BOOST PAD! ⚡", 1000);
-                        this.player2Physics.justHitBoostPad = false;
-                    }
-
-                    // Update dynamic track props
-                    if (this.track && typeof this.track.update === 'function') {
-                        this.track.update(dt);
-                    }
-
-                    // Dual camera update
-                    this.renderer.updateSplitCameras(this.playerPhysics, this.player2Physics, dt);
-
-                    // Dual HUD update
-                    this.hud.updateSplit(this.playerPhysics, this.player2Physics, this.track);
-
-                    // Finish & winner condition
-                    if (this.gameState === 'RACING') {
-                        if (this.playerPhysics.currentLap > 3) {
-                            this.gameState = 'FINISHED';
-                            this.hud.showBanner("PLAYER 1 WINS! 🏆", 6000);
-                        } else if (this.player2Physics.currentLap > 3) {
-                            this.gameState = 'FINISHED';
-                            this.hud.showBanner("PLAYER 2 WINS! 🏆", 6000);
-                        }
-                    }
+                if (this.playerPhysics.newRecordBanner) {
+                    this.hud.showBanner("⚡ NEW LAP RECORD! " + this.hud.formatTime(this.playerPhysics.bestLapTime), 3200);
+                    this.sound.playBoostPad();
+                    this.playerPhysics.newRecordBanner = false;
                 }
 
-                if (this.scenery) {
-                    this.scenery.update(dt);
+                // Update Camera & sparks
+                this.renderer.updateCamera(this.playerPhysics, dt);
+
+                // Check finish condition (3 laps)
+                if (this.playerPhysics.currentLap > 3 && this.gameState === 'RACING') {
+                    this.gameState = 'FINISHED';
+                    this.hud.showBanner("RACE COMPLETE! 🏆", 5000);
                 }
             }
+
+            // Update dynamic track props (kinetic hazard spheres, gates)
+            if (this.track && typeof this.track.update === 'function') {
+                this.track.update(dt);
+            }
+
+            // Update AI Rivals
+            this.aiRivals.forEach(ai => ai.update(dt));
+
+            // Update Multiplayer remote players
+            this.multiplayer.update(dt);
+
+            // Update scenery animations (particles, pulsating signs)
+            if (this.scenery) {
+                this.scenery.update(dt);
+            }
+
+            // Update HUD
+            this.hud.update(this.playerPhysics, this.aiRivals, this.track);
         }
 
         // Render scene

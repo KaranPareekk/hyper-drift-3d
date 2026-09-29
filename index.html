@@ -75,7 +75,6 @@
         <div id="cornerPlayActions" class="glass-card menu-corner-card corner-bottom-right">
             <div class="section-label">Race Launchpad</div>
             <button id="btnStartSolo" class="btn-primary">START SOLO RACE (VS AI)</button>
-            <button id="btnStartSplit" class="btn-split" style="margin-top: 0.45rem;">⚡ 2-PLAYER SPLIT-SCREEN</button>
             <div class="multiplayer-actions">
                 <button id="btnCreateRoom" class="btn-secondary">HOST ROOM</button>
                 <input type="text" id="roomCodeInput" class="neon-input" placeholder="CODE" style="max-width: 90px; padding: 0.35rem 0.5rem; font-size: 0.82rem;">
@@ -84,7 +83,7 @@
             <div id="roomStatus" class="room-status"></div>
 
             <div class="controls-hint">
-                <strong>P1:</strong> WASD + ENTER &bull; <strong>P2:</strong> ARROWS + SHIFT &bull; <strong>R/P:</strong> RESET
+                <strong>DRIVE:</strong> W / ▲ &bull; <strong>STEER:</strong> A/D or ◀/▶ &bull; <strong>BRAKE:</strong> S / ▼ &bull; <strong>NITRO:</strong> SPACE &bull; <strong>RESET:</strong> R
             </div>
         </div>
     </div>
@@ -93,11 +92,6 @@
     <div id="hudScreen">
         <!-- Speed Lines Radial Warp Canvas -->
         <canvas id="speedLinesCanvas" class="speed-lines-canvas"></canvas>
-
-        <!-- Split-Screen Divider -->
-        <div id="splitDivider" class="split-divider">
-            <div class="split-line"></div>
-        </div>
 
         <!-- SINGLE PLAYER / MAIN HUD CONTAINERS -->
         <div id="singleHudContainers">
@@ -173,59 +167,6 @@
                     <span>STEER RIGHT</span>
                     <span class="btn-subtext">D &bull; ▶</span>
                 </button>
-            </div>
-        </div>
-
-        <!-- 2-PLAYER LOCAL SPLIT-SCREEN HUD -->
-        <div id="splitHudContainers" class="split-hud-containers">
-            <!-- Left Half: Player 1 (Cyan Theme) -->
-            <div class="split-side split-side-p1">
-                <div class="split-player-tag p1-tag">PLAYER 1 &bull; WASD + ENTER</div>
-                <div class="split-top-bar">
-                    <div class="split-badge-box">
-                        <span class="split-badge-label">POS</span>
-                        <span id="p1Pos" class="split-pos-val">1ST</span>
-                    </div>
-                    <div class="split-badge-box">
-                        <span class="split-badge-label">LAP</span>
-                        <span id="p1Lap" class="split-lap-val">1/3</span>
-                    </div>
-                </div>
-                <div class="split-bottom-cluster">
-                    <div class="split-speedo">
-                        <span id="p1Gear" class="gear-badge" style="font-size:0.9rem; padding:0.2rem 0.5rem;">1</span>
-                        <span id="p1Speed" class="speedo-number" style="font-size:2.4rem;">0</span>
-                        <span class="speedo-unit">KM/H</span>
-                    </div>
-                    <div class="bar-track" style="height: 5px; width: 140px; margin-top: 3px;">
-                        <div id="p1NitroBar" class="nitro-bar"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Half: Player 2 (Magenta Theme) -->
-            <div class="split-side split-side-p2">
-                <div class="split-player-tag p2-tag">PLAYER 2 &bull; ARROWS + SHIFT</div>
-                <div class="split-top-bar">
-                    <div class="split-badge-box">
-                        <span class="split-badge-label">POS</span>
-                        <span id="p2Pos" class="split-pos-val" style="color: #ff0055;">2ND</span>
-                    </div>
-                    <div class="split-badge-box">
-                        <span class="split-badge-label">LAP</span>
-                        <span id="p2Lap" class="split-lap-val">1/3</span>
-                    </div>
-                </div>
-                <div class="split-bottom-cluster">
-                    <div class="split-speedo">
-                        <span id="p2Gear" class="gear-badge" style="font-size:0.9rem; padding:0.2rem 0.5rem; background:rgba(255,0,85,0.25); border-color:#ff0055; color:#ff0055;">1</span>
-                        <span id="p2Speed" class="speedo-number" style="font-size:2.4rem; color:#ff0055;">0</span>
-                        <span class="speedo-unit" style="color:#ff88aa;">KM/H</span>
-                    </div>
-                    <div class="bar-track" style="height: 5px; width: 140px; margin-top: 3px;">
-                        <div id="p2NitroBar" class="nitro-bar" style="background:linear-gradient(90deg, #ff0055, #ffaa00);"></div>
-                    </div>
-                </div>
             </div>
         </div>
 

@@ -72,7 +72,16 @@ export class VehiclePhysics {
         this.distanceTraveled = 0;
         this.lapTimes = [];
         this.currentLapTime = 0;
-        this.bestLapTime = Infinity;
+        let storedBest = Infinity;
+        try {
+            const raw = localStorage.getItem('hyperdrift_best_lap');
+            if (raw) {
+                const parsed = parseFloat(raw);
+                if (!isNaN(parsed) && parsed > 5) storedBest = parsed;
+            }
+        } catch (e) {}
+        this.bestLapTime = storedBest;
+        this.newRecordBanner = false;
         this.finished = false;
 
         // Inputs
@@ -590,11 +599,17 @@ export class VehiclePhysics {
 
         // Exhaust backfire & nitro flames
         if (this.animated && this.animated.flames) {
-            const flameIntensity = this.isNitro ? (0.85 + Math.random() * 0.35) : 0.0;
+            const isBoosting = Boolean(this.isNitro);
+            const flameIntensity = isBoosting ? (0.85 + Math.random() * 0.35) : 0.0;
             this.animated.flames.forEach(flame => {
                 flame.material.opacity = flameIntensity;
-                if (flameIntensity > 0) {
-                    flame.scale.set(1 + Math.random() * 0.3, 1 + Math.random() * 0.5, 1);
+                flame.visible = isBoosting;
+                if (isBoosting) {
+                    flame.scale.set(
+                        0.9 + Math.random() * 0.35,
+                        0.9 + Math.random() * 0.35,
+                        1.2 + Math.random() * 0.95
+                    );
                 }
             });
         }
@@ -630,6 +645,10 @@ export class VehiclePhysics {
                 this.lapTimes.push(this.currentLapTime);
                 if (this.currentLapTime < this.bestLapTime) {
                     this.bestLapTime = this.currentLapTime;
+                    this.newRecordBanner = true;
+                    try {
+                        localStorage.setItem('hyperdrift_best_lap', this.bestLapTime.toFixed(2));
+                    } catch (e) {}
                 }
                 this.currentLap++;
                 this.currentLapTime = 0;
