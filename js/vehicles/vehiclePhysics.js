@@ -284,10 +284,20 @@ export class VehiclePhysics {
         this.vLong += aLong * dt;
         this.vLat += aLat * dt;
 
-        // Direct low-speed kinematic turning authority:
-        // Responsive pivoting without sudden jerks, providing immediate steering feedback
         const rawSteerInput = (this.input.left - this.input.right);
-        if (absSpeed < 14.0 && Math.abs(rawSteerInput) > 0.05) {
+
+        // 1. STABLE REVERSE CONTROL:
+        // In reverse (vLong < -0.2), prevent the positive-feedback bicycle model from causing wild spinouts.
+        if (this.vLong < -0.2) {
+            this.yawRate = -rawSteerInput * (0.85 + (absSpeed / 15.0) * 0.40);
+            this.vLat = -rawSteerInput * 1.8;
+            if (rawSteerInput === 0) {
+                this.yawRate = 0;
+                this.vLat *= 0.85;
+            }
+        } else if (absSpeed < 14.0 && Math.abs(rawSteerInput) > 0.05) {
+            // Direct low-speed kinematic turning authority:
+            // Responsive pivoting providing immediate steering feedback
             const lowSpeedPivot = rawSteerInput * (1.10 * (1.0 - absSpeed / 14.0) + (absSpeed / 14.0) * 0.70);
             this.yawRate = THREE.MathUtils.lerp(this.yawRate, lowSpeedPivot, 0.22);
         } else {
@@ -301,6 +311,12 @@ export class VehiclePhysics {
             if (rawSteerInput === 0) {
                 this.yawRate *= Math.pow(0.5, dt * 30);
             }
+        }
+
+        // Caster self-centering when steering is released
+        if (rawSteerInput === 0 && absSpeed > 1.2 && !this.isDrifting) {
+            this.carHeadingAngle *= Math.pow(0.08, dt * 6.0);
+            this.yawRate *= Math.pow(0.12, dt * 8.0);
         }
 
         // Detect Physical Drift State (only active when traveling forward at racing speeds)
@@ -321,9 +337,10 @@ export class VehiclePhysics {
         // Integrate heading angle in the road surface tangent plane
         this.carHeadingAngle += this.yawRate * dt;
 
-        // Keep heading normalized
-        while (this.carHeadingAngle > Math.PI) this.carHeadingAngle -= Math.PI * 2;
-        while (this.carHeadingAngle < -Math.PI) this.carHeadingAngle += Math.PI * 2;
+        // Keep heading within realistic racing drift envelope relative to track tangent (+-55 deg = +-0.96 rad)
+        // Strictly prevents the car from turning backwards into traffic or wedging into barriers
+        const maxDriftEnvelope = 0.95;
+        this.carHeadingAngle = THREE.MathUtils.clamp(this.carHeadingAngle, -maxDriftEnvelope, maxDriftEnvelope);
 
         // Compute forward and right unit vectors on the 3D road surface plane
         // roadInfo.tangent (T) = along track
@@ -392,14 +409,14 @@ export class VehiclePhysics {
         // If player is steering AWAY from the barrier, give crisp, responsive recovery steering torque
         // Right wall (sign > 0): steering away = turning LEFT (positive yawRate, input.left > 0)
         // Left wall (sign < 0): steering away = turning RIGHT (negative yawRate, input.right > 0)
-        if (absD > barrierLimit - 1.5) {
+        if (absD > barrierLimit - 1.6) {
             const isSteeringAway = (sign > 0 && (this.input.left > 0 || this.steerAngle > 0.04)) ||
                                    (sign < 0 && (this.input.right > 0 || this.steerAngle < -0.04));
             if (isSteeringAway) {
                 // Controlled, gentle steering torque away from the wall toward track center
-                this.yawRate += sign * 4.5 * dt;
+                this.yawRate += sign * 5.5 * dt;
                 // Subtle lateral velocity assist pushing car back onto the racing line
-                this.vLat += -sign * 3.0 * dt;
+                this.vLat += -sign * 4.0 * dt;
             }
         }
 
@@ -410,33 +427,36 @@ export class VehiclePhysics {
             const severity = THREE.MathUtils.clamp(penetration / 0.40, 0.20, 1.0);
 
             // Gravity effect on tilted / banked turns:
-            // gLat = -9.81 * binormal.y
-            // If sign * gLat > 0, gravity pulls the car into this barrier (lower wall on banked curve)
             const gLat = -9.81 * (roadInfo.binormal ? roadInfo.binormal.y : 0);
             const wallGravityPull = Math.max(0, sign * gLat);
 
             // Clear car position back onto the track just inside the boundary cushion
-            const clearanceDist = penetration + 0.18;
+            const clearanceDist = penetration + 0.25;
             this.root.position.addScaledVector(roadInfo.binormal, -sign * clearanceDist);
             if (track) {
                 const surfaceSnap = track.getRoadSurfaceAt(this.root.position);
                 this.root.position.copy(surfaceSnap.surfacePoint);
             }
 
+            // INSTANT HEADING DEFLECTION:
+            // Force car nose away from wall so forward velocity glides off wall instead of wedging deeper into it!
+            if (sign > 0 && this.carHeadingAngle < 0.08) {
+                this.carHeadingAngle = 0.09;
+            } else if (sign < 0 && this.carHeadingAngle > -0.08) {
+                this.carHeadingAngle = -0.09;
+            }
+
             // Controlled physical lateral deflection toward the track center (-sign direction)
-            // Extra deflection velocity comfortably overcomes slope gravity on the lower wall
-            const baseDeflect = 4.2 + (severity * 3.8) + (wallGravityPull * 0.90);
+            const isSteeringAway = (sign > 0 && this.input.left > 0) || (sign < 0 && this.input.right > 0);
+            const baseDeflect = (isSteeringAway ? 6.5 : 4.5) + (severity * 3.0) + (wallGravityPull * 0.90);
 
             // Apply deflection away from the wall
-            if (this.vLat * sign > -0.5) {
-                this.vLat = -sign * baseDeflect;
-            } else {
-                // Already moving away from wall: guarantee minimum escape velocity
-                this.vLat = -sign * Math.max(Math.abs(this.vLat), baseDeflect * 0.75);
+            this.vLat = -sign * baseDeflect;
+            if (isSteeringAway) {
+                this.yawRate = sign * 2.2;
             }
 
             // Impact detection & Deceleration Penalty:
-            // "make the car loose it seped by 30% if it hits wall"
             const isNewImpact = !this.inBarrierContact;
             this.inBarrierContact = true;
 
@@ -451,19 +471,8 @@ export class VehiclePhysics {
                 const scrapeFriction = THREE.MathUtils.lerp(0.985, 0.965, severity);
                 this.vLong *= Math.pow(scrapeFriction, dt * 60);
                 if (this.input.forward > 0) {
-                    this.vLong = Math.max(3.5, this.vLong);
+                    this.vLong = Math.max(4.0, this.vLong);
                 }
-            }
-            // If in reverse (vLong < 0) or braking (input.backward > 0), DO NOT clamp or alter forward momentum!
-            // Reverse is completely uninhibited so the player can effortlessly back up and pull away.
-
-            // Glance heading deflection away from wall only if penetrating and player is NOT actively counter-steering
-            const isCounterSteering = (sign > 0 && (this.input.left > 0 || this.steerAngle > 0.05)) ||
-                                      (sign < 0 && (this.input.right > 0 || this.steerAngle < -0.05));
-            if (!isCounterSteering && sign * this.carHeadingAngle < 0) {
-                // Subtle glance angle inward toward the circuit without locking steering
-                const targetHeading = sign * THREE.MathUtils.lerp(0.02, 0.05, severity);
-                this.carHeadingAngle = THREE.MathUtils.lerp(this.carHeadingAngle, targetHeading, 0.12);
             }
         } else {
             this.inBarrierContact = false;
