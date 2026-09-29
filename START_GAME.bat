@@ -1,7 +1,11 @@
 @echo off
-title HyperDrift 3D Server
+title Hyper Drift 3D - Local Server
 cd /d "%~dp0"
-echo Starting HyperDrift 3D Local Server...
-start "" http://localhost:8000
-py server.py
+echo ========================================================
+echo   STARTING HYPER DRIFT 3D RACING GAME...
+echo ========================================================
+py server.py --open
+if %errorlevel% neq 0 (
+    python server.py --open
+)
 pause
