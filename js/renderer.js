@@ -43,10 +43,8 @@ export class GameRenderer {
         this.cameraLookOffset = new THREE.Vector3(0, 1.3, 5.0);
         this.baseFov = 65;
         this.currentFov = 65;
-        this.currentFov2 = 65;
         this.cameraShake = 0;
         this.currentCameraRoll = 0;
-        this.currentCamera2Roll = 0;
 
         // Window resize
         window.addEventListener('resize', () => this.onResize());
@@ -79,11 +77,17 @@ export class GameRenderer {
         this.camera.add(this.cameraLight);
         this.scene.add(this.camera);
 
-        // Player 2 Camera fill light
-        this.camera2Light = new THREE.DirectionalLight(0xffffff, 0.9);
-        this.camera2Light.position.set(0, 4, 8);
-        this.camera2.add(this.camera2Light);
-        this.scene.add(this.camera2);
+        // Studio Showroom Spotlight directly overhead
+        const showroomSpot = new THREE.SpotLight(0x00f0ff, 3.5, 25, Math.PI / 3, 0.5, 1.0);
+        showroomSpot.position.set(0, 8, 2);
+        showroomSpot.target.position.set(0, 1.3, 0);
+        this.scene.add(showroomSpot);
+        this.scene.add(showroomSpot.target);
+
+        // Warm rim light from the rear left to highlight body curves
+        const rimLight = new THREE.DirectionalLight(0xff0077, 1.8);
+        rimLight.position.set(-6, 4, -6);
+        this.scene.add(rimLight);
     }
 
     setupSkidmarkSystem() {
