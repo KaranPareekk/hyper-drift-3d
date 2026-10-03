@@ -152,23 +152,7 @@ export class VehiclePhysics {
     }
 
     processInputs(dt) {
-        const speedKmh = Math.abs(this.vLong * 3.6);
-
-        // Progressive, responsive steering lock: 0.44 rad (~25.2 deg) at low speeds down to 0.16 rad at top speed
-        // Scaled by player's sensitivity preference
-        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 75.0, 1.25));
-        const sens = this.steeringSensitivity || 1.0;
-        const maxSteer = THREE.MathUtils.lerp(0.16, 0.44, speedFactor) * sens;
-
-        const rawSteerInput = (this.input.left - this.input.right); // positive = left turn, negative = right turn
-        const targetSteer = rawSteerInput * maxSteer;
-
-        // Fast, crisp steering transition rate with snappy self-centering
-        const isCounterSteer = (this.vLat * rawSteerInput < -0.1);
-        const steerSpeed = (rawSteerInput === 0 ? 18.0 : (isCounterSteer ? 24.0 : 16.0)) * THREE.MathUtils.clamp(sens, 0.8, 1.4);
-        this.steerAngle += (targetSteer - this.steerAngle) * Math.min(1.0, steerSpeed * dt);
-
-        // Spacebar = BOOST (Nitro). Spacebar NEVER activates brakes or handbrake!
+        // Spacebar = BOOST (Nitro). Evaluated upfront so steering response adapts instantly
         const wantsBoost = Boolean(this.input.nitro && this.nitro > 2);
         this.isNitro = wantsBoost;
         if (this.isNitro) {
@@ -178,6 +162,27 @@ export class VehiclePhysics {
             const rechargeRate = this.isDrifting ? 20.0 : 8.0;
             this.nitro = Math.min(100, this.nitro + rechargeRate * dt);
         }
+
+        const speedKmh = Math.abs(this.vLong * 3.6);
+
+        // Progressive, responsive steering lock:
+        // Scaled by player's sensitivity preference + Boost multiplier
+        const speedFactor = 1.0 / (1.0 + Math.pow(speedKmh / 85.0, 1.2));
+
+        // BOOST AGILITY: When booster is applied, increase steering sensitivity & lock
+        // so the player can carve corners and retain full steering control at top speeds
+        const boostMultiplier = this.isNitro ? 1.55 : 1.0;
+        const sens = (this.steeringSensitivity || 1.0) * boostMultiplier;
+        const minSteerLock = this.isNitro ? 0.32 : 0.18;
+        const maxSteer = THREE.MathUtils.lerp(minSteerLock, 0.48, speedFactor) * sens;
+
+        const rawSteerInput = (this.input.left - this.input.right); // positive = left turn, negative = right turn
+        const targetSteer = rawSteerInput * maxSteer;
+
+        // Fast, crisp steering transition rate with snappy self-centering
+        const isCounterSteer = (this.vLat * rawSteerInput < -0.1);
+        const steerSpeed = (rawSteerInput === 0 ? 18.0 : (isCounterSteer ? 26.0 : 18.0)) * THREE.MathUtils.clamp(sens, 0.8, 1.8);
+        this.steerAngle += (targetSteer - this.steerAngle) * Math.min(1.0, steerSpeed * dt);
 
         // Handbrake is permanently disabled from Spacebar
         this.isHandbrake = false;
@@ -311,6 +316,11 @@ export class VehiclePhysics {
             this.yawRate = THREE.MathUtils.lerp(this.yawRate, lowSpeedPivot, 0.22);
         } else {
             this.yawRate += yawAccel * dt;
+            if (this.isNitro && Math.abs(rawSteerInput) > 0.05) {
+                // Agile high-speed yaw torque assist under Nitro boost to eliminate sluggish understeer
+                const boostYawAssist = rawSteerInput * 1.45;
+                this.yawRate = THREE.MathUtils.lerp(this.yawRate, boostYawAssist, 14.0 * dt);
+            }
         }
 
         // Low-speed damping to bring stationary car to a crisp rest without vibrating (preserve yaw if player is steering)
@@ -411,58 +421,55 @@ export class VehiclePhysics {
         const d = roadInfo.signedLateralDist;
         const absD = Math.abs(d);
         const barrierDist = roadInfo.barrierDist || 10.4;
-        const barrierLimit = barrierDist - 1.0; // Collision boundary cushion (~9.4m)
+        const barrierLimit = barrierDist - 0.9; // Boundary collision limit (~9.5m)
         const sign = Math.sign(d); // +1 = right wall (+B), -1 = left wall (-B)
 
-        // 1. Near-boundary recovery assist:
-        // If player is steering AWAY from the barrier, give crisp, responsive recovery steering torque
-        // Right wall (sign > 0): steering away = turning LEFT (positive yawRate, input.left > 0)
-        // Left wall (sign < 0): steering away = turning RIGHT (negative yawRate, input.right > 0)
-        if (absD > barrierLimit - 1.6) {
+        // 1. Near-boundary smooth guide assist:
+        // When nearing barrier, if steering away from wall, assist the turn back toward track center
+        if (absD > barrierLimit - 1.5) {
             const isSteeringAway = (sign > 0 && (this.input.left > 0 || this.steerAngle > 0.04)) ||
                                    (sign < 0 && (this.input.right > 0 || this.steerAngle < -0.04));
             if (isSteeringAway) {
-                // Controlled, gentle steering torque away from the wall toward track center
-                this.yawRate += sign * 5.5 * dt;
-                // Subtle lateral velocity assist pushing car back onto the racing line
-                this.vLat += -sign * 4.0 * dt;
+                this.yawRate += sign * 4.0 * dt;
+                // Gentle inward drift without sudden lateral jerk
+                this.vLat += -sign * 2.0 * dt;
             }
         }
 
-        // 2. Physical boundary collision deflection
+        // 2. Barrier Contact: Smooth slide & grind without ping-pong repulsion
         if (absD > barrierLimit) {
             const penetration = absD - barrierLimit;
-            // Proportional collision severity (0.2 for light brush up to 1.0 for hard impact)
             const severity = THREE.MathUtils.clamp(penetration / 0.40, 0.20, 1.0);
 
-            // Gravity effect on tilted / banked turns:
-            const gLat = -9.81 * (roadInfo.binormal ? roadInfo.binormal.y : 0);
-            const wallGravityPull = Math.max(0, sign * gLat);
-
-            // Clear car position back onto the track just inside the boundary cushion
-            const clearanceDist = penetration + 0.25;
+            // Keep car strictly constrained to the track boundary without pushing it deep inside
+            const clearanceDist = penetration + 0.15;
             this.root.position.addScaledVector(roadInfo.binormal, -sign * clearanceDist);
             if (track) {
                 const surfaceSnap = track.getRoadSurfaceAt(this.root.position);
                 this.root.position.copy(surfaceSnap.surfacePoint);
             }
 
-            // INSTANT HEADING DEFLECTION:
-            // Force car nose away from wall so forward velocity glides off wall instead of wedging deeper into it!
-            if (sign > 0 && this.carHeadingAngle < 0.08) {
-                this.carHeadingAngle = 0.09;
-            } else if (sign < 0 && this.carHeadingAngle > -0.08) {
-                this.carHeadingAngle = -0.09;
+            // CANCEL OUT LATERAL VELOCITY INTO THE WALL (absorb impact)
+            // If the car was traveling towards the wall, kill that momentum immediately
+            if (sign * this.vLat > 0) {
+                this.vLat = 0;
             }
 
-            // Controlled physical lateral deflection toward the track center (-sign direction)
-            const isSteeringAway = (sign > 0 && this.input.left > 0) || (sign < 0 && this.input.right > 0);
-            const baseDeflect = (isSteeringAway ? 6.5 : 4.5) + (severity * 3.0) + (wallGravityPull * 0.90);
+            // GENTLE SEPARATION CUSHION ONLY:
+            // Never fling or bounce the car across the road to the opposite side!
+            // Just maintain a tiny separation velocity (-sign * 0.4 m/s)
+            this.vLat = -sign * 0.4;
 
-            // Apply deflection away from the wall
-            this.vLat = -sign * baseDeflect;
+            // STABILIZE HEADING: Align car nose parallel to the track tangent
+            // Dampen yaw spin so car slides gracefully forward instead of spinning out
+            this.carHeadingAngle = THREE.MathUtils.lerp(this.carHeadingAngle, 0, 0.22);
+            this.yawRate *= 0.35;
+
+            // If player actively steers away from wall, give responsive peeling torque
+            const isSteeringAway = (sign > 0 && this.input.left > 0) || (sign < 0 && this.input.right > 0);
             if (isSteeringAway) {
-                this.yawRate = sign * 2.2;
+                this.yawRate += sign * 2.8 * dt;
+                this.vLat = -sign * 1.5;
             }
 
             // Impact detection & Deceleration Penalty:
@@ -472,15 +479,15 @@ export class VehiclePhysics {
             if (isNewImpact) {
                 this.justHitBarrier = true;
                 this.impactSeverity = severity;
-                if (this.vLong > 1.0) {
-                    this.vLong *= 0.70; // Lose 30% of forward speed on wall hit!
+                if (this.vLong > 2.0) {
+                    this.vLong *= 0.82; // Modest speed penalty (-18%) without coming to a dead stop
                 }
             } else if (this.vLong > 1.0) {
                 // Continuous scraping friction along the wall
-                const scrapeFriction = THREE.MathUtils.lerp(0.985, 0.965, severity);
+                const scrapeFriction = THREE.MathUtils.lerp(0.988, 0.970, severity);
                 this.vLong *= Math.pow(scrapeFriction, dt * 60);
                 if (this.input.forward > 0) {
-                    this.vLong = Math.max(4.0, this.vLong);
+                    this.vLong = Math.max(5.0, this.vLong);
                 }
             }
         } else {

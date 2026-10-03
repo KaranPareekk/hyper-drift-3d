@@ -133,7 +133,6 @@ export class LobbyUI {
         window.focus();
 
         if (this.menuScreen) this.menuScreen.style.display = 'none';
-        if (this.hudScreen) this.hudScreen.style.display = 'block';
 
         this.game.startRace(isMultiplayer);
     }

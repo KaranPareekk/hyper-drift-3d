@@ -145,72 +145,104 @@ class Game {
     }
 
     startRace(isMultiplayer = false) {
-        // Remove showroom car & turntable
-        if (this.showroomCar) {
-            this.scene.remove(this.showroomCar.root);
-            this.showroomCar = null;
+        // UI elements for the animated loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingSubtitle = document.getElementById('loadingSubtitle');
+        const loadingBarFill = document.getElementById('loadingBarFill');
+        const loadingStatusText = document.getElementById('loadingStatusText');
+        const hudScreen = document.getElementById('hudScreen');
+
+        if (loadingSubtitle) {
+            loadingSubtitle.innerText = `PREPARING TRACK // SEED: ${this.trackSeed} • ${this.selectedCarType.toUpperCase()}`;
         }
-        if (this.showroomTurntable) {
-            this.scene.remove(this.showroomTurntable);
-            this.showroomTurntable = null;
-        }
+        if (loadingBarFill) loadingBarFill.style.width = '15%';
+        if (loadingStatusText) loadingStatusText.innerText = 'CALCULATING ROAD SPLINES & BANKING...';
+        if (loadingScreen) loadingScreen.classList.add('active');
 
-        // Clean up any old player car
-        if (this.playerCar) {
-            this.scene.remove(this.playerCar.root);
-            this.playerCar = null;
-            this.playerPhysics = null;
-        }
-
-        // Build procedural track if not already built
-        this.loadTrack(this.trackSeed);
-
-        // Spawn Player Car
-        this.playerCar = this.carBuilder.createCar(this.selectedCarType, this.selectedCarColor);
-        this.scene.add(this.playerCar.root);
-
-        this.playerPhysics = new VehiclePhysics(this.playerCar, {
-            type: this.selectedCarType
-        });
-        this.playerPhysics.steeringSensitivity = this.selectedSensitivity || 1.0;
-
-        // Place at grid slot 0 flush with the road surface
-        const spawn = this.track.getSpawnTransform(0);
-        this.playerPhysics.root.position.copy(spawn.position);
-        this.playerPhysics.carHeadingAngle = 0;
-        this.playerPhysics.vLong = 0;
-        this.playerPhysics.vLat = 0;
-        this.playerPhysics.yawRate = 0;
-        const roadInfo = this.track.getRoadSurfaceAt(spawn.position);
-        this.playerPhysics.alignOrientationWithTrack(roadInfo);
-        this.renderer.snapCamera(this.playerPhysics);
-
-        // Spawn AI Rivals for Solo Race
-        this.aiRivals = [];
-        if (!isMultiplayer) {
-            const rivalColors = [0xff0055, 0xffbb00, 0x9900ff];
-            const rivalTypes = ['vortex', 'apex', 'vortex'];
-
-            for (let i = 1; i <= 2; i++) {
-                const rivalCar = this.carBuilder.createCar(rivalTypes[i - 1], rivalColors[i - 1]);
-                this.scene.add(rivalCar.root);
-                const rival = new AIRival(rivalCar, this.track, i, {
-                    type: rivalTypes[i - 1],
-                    skill: 0.82 + i * 0.06
-                });
-                this.aiRivals.push(rival);
+        // Stage 1: Yield to browser so the animated loading screen and spinning reactor ring render first
+        setTimeout(() => {
+            // Remove showroom car & turntable
+            if (this.showroomCar) {
+                this.scene.remove(this.showroomCar.root);
+                this.showroomCar = null;
             }
-        }
+            if (this.showroomTurntable) {
+                this.scene.remove(this.showroomTurntable);
+                this.showroomTurntable = null;
+            }
 
-        // Clear stale inputs and blur any focused text inputs
-        this.clearInputs();
-        if (document.activeElement && typeof document.activeElement.blur === 'function') {
-            document.activeElement.blur();
-        }
-        window.focus();
+            // Clean up any old player car
+            if (this.playerCar) {
+                this.scene.remove(this.playerCar.root);
+                this.playerCar = null;
+                this.playerPhysics = null;
+            }
 
-        // Start Countdown sequence
-        this.startCountdown();
+            // Build procedural track
+            this.loadTrack(this.trackSeed);
+
+            if (loadingBarFill) loadingBarFill.style.width = '65%';
+            if (loadingStatusText) loadingStatusText.innerText = 'ASSEMBLING HYPERCAR & GRID TELEMETRY...';
+
+            // Stage 2: Spawn player car, physics, camera, and rivals
+            setTimeout(() => {
+                // Spawn Player Car
+                this.playerCar = this.carBuilder.createCar(this.selectedCarType, this.selectedCarColor);
+                this.scene.add(this.playerCar.root);
+
+                this.playerPhysics = new VehiclePhysics(this.playerCar, {
+                    type: this.selectedCarType
+                });
+                this.playerPhysics.steeringSensitivity = this.selectedSensitivity || 1.0;
+
+                // Place at grid slot 0 flush with the road surface
+                const spawn = this.track.getSpawnTransform(0);
+                this.playerPhysics.root.position.copy(spawn.position);
+                this.playerPhysics.carHeadingAngle = 0;
+                this.playerPhysics.vLong = 0;
+                this.playerPhysics.vLat = 0;
+                this.playerPhysics.yawRate = 0;
+                const roadInfo = this.track.getRoadSurfaceAt(spawn.position);
+                this.playerPhysics.alignOrientationWithTrack(roadInfo);
+                this.renderer.snapCamera(this.playerPhysics);
+
+                // Spawn AI Rivals for Solo Race
+                this.aiRivals = [];
+                if (!isMultiplayer) {
+                    const rivalColors = [0xff0055, 0xffbb00, 0x9900ff];
+                    const rivalTypes = ['vortex', 'apex', 'vortex'];
+
+                    for (let i = 1; i <= 2; i++) {
+                        const rivalCar = this.carBuilder.createCar(rivalTypes[i - 1], rivalColors[i - 1]);
+                        this.scene.add(rivalCar.root);
+                        const rival = new AIRival(rivalCar, this.track, i, {
+                            type: rivalTypes[i - 1],
+                            skill: 0.82 + i * 0.06
+                        });
+                        this.aiRivals.push(rival);
+                    }
+                }
+
+                // Clear stale inputs and blur any focused text inputs
+                this.clearInputs();
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+                window.focus();
+
+                if (loadingBarFill) loadingBarFill.style.width = '100%';
+                if (loadingStatusText) loadingStatusText.innerText = 'GRID CLEARED — ENGINES READY!';
+
+                // Stage 3: Smoothly fade loading screen, reveal HUD, and initiate 3-2-1 countdown
+                setTimeout(() => {
+                    if (loadingScreen) loadingScreen.classList.remove('active');
+                    if (hudScreen) hudScreen.style.display = 'block';
+
+                    // Start Countdown sequence
+                    this.startCountdown();
+                }, 380);
+            }, 180);
+        }, 120);
     }
 
     startCountdown() {

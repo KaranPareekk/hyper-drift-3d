@@ -361,6 +361,149 @@ body, html {
 }
 
 /* =======================================================
+   RACE LOADING SCREEN
+   ======================================================= */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    background: radial-gradient(circle at 50% 50%, rgba(12, 18, 32, 0.96) 0%, rgba(6, 8, 14, 0.99) 100%);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.loading-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 440px;
+    max-width: 90vw;
+    padding: 2.2rem 2.5rem;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    box-shadow: 0 0 50px rgba(0, 240, 255, 0.25), inset 0 0 20px rgba(0, 240, 255, 0.1);
+}
+
+.loading-reactor {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reactor-ring {
+    position: absolute;
+    border-radius: 50%;
+}
+
+.reactor-ring.outer {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed #00f0ff;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+    animation: rotateOuter 2.8s linear infinite;
+}
+
+.reactor-ring.inner {
+    width: 68%;
+    height: 68%;
+    border: 2px solid transparent;
+    border-top: 2px solid #ff0055;
+    border-bottom: 2px solid #ff0055;
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+    animation: rotateInner 1.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.reactor-core {
+    font-size: 1.8rem;
+    color: #00f0ff;
+    text-shadow: 0 0 16px #00f0ff;
+    animation: pulseCore 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes rotateOuter {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes rotateInner {
+    0% { transform: rotate(360deg); }
+    100% { transform: rotate(0deg); }
+}
+
+@keyframes pulseCore {
+    0% { transform: scale(0.9); opacity: 0.8; }
+    100% { transform: scale(1.15); opacity: 1; }
+}
+
+.loading-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+    margin-bottom: 0.35rem;
+}
+
+.loading-subtitle {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+    color: #00f0ff;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+}
+
+.loading-bar-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+    margin-bottom: 0.9rem;
+}
+
+.loading-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #00f0ff, #ff0055);
+    border-radius: 4px;
+    box-shadow: 0 0 14px #00f0ff;
+    transition: width 0.25s ease-out;
+}
+
+.loading-status {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 1.5px;
+    color: #8fa0c0;
+    text-transform: uppercase;
+    animation: pulseNotice 1.8s infinite ease-in-out;
+}
+
+/* =======================================================
    IN-GAME HUD
    ======================================================= */
 #hudScreen {
