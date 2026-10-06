@@ -217,48 +217,130 @@ export class ProceduralTrack {
             }
         }
 
-        // Create high-visibility asphalt texture with center dashed lines & side boundaries
+        // Create high-detail wet asphalt texture with rubberized tire grooves, luminous retro-reflectors & lane markings
         const roadTexCanvas = document.createElement('canvas');
-        roadTexCanvas.width = 512;
-        roadTexCanvas.height = 1024;
+        roadTexCanvas.width = 1024;
+        roadTexCanvas.height = 2048;
         const rctx = roadTexCanvas.getContext('2d');
 
-        // Asphalt base
-        rctx.fillStyle = '#22252c';
-        rctx.fillRect(0, 0, 512, 1024);
+        // Dark wet tarmac base
+        rctx.fillStyle = '#11141b';
+        rctx.fillRect(0, 0, 1024, 2048);
 
-        // Asphalt grain
-        rctx.fillStyle = '#1c1e24';
-        for (let g = 0; g < 4000; g++) {
-            const gx = Math.random() * 512;
-            const gy = Math.random() * 1024;
-            rctx.fillRect(gx, gy, 2, 2);
+        // Subtle wet asphalt puddles / sheen gradients
+        for (let p = 0; p < 18; p++) {
+            const px = Math.random() * 1024;
+            const py = Math.random() * 2048;
+            const pr = 80 + Math.random() * 140;
+            const pGrad = rctx.createRadialGradient(px, py, 10, px, py, pr);
+            pGrad.addColorStop(0, 'rgba(24, 28, 38, 0.45)');
+            pGrad.addColorStop(1, 'rgba(17, 20, 27, 0)');
+            rctx.fillStyle = pGrad;
+            rctx.beginPath();
+            rctx.arc(px, py, pr, 0, Math.PI * 2);
+            rctx.fill();
         }
 
-        // Solid white edge boundary lines (outer margin)
-        rctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        rctx.fillRect(24, 0, 8, 1024);   // left edge line
-        rctx.fillRect(480, 0, 8, 1024);  // right edge line
+        // Multi-frequency asphalt aggregate noise (dense crushed stone texture)
+        for (let g = 0; g < 18000; g++) {
+            const gx = Math.random() * 1024;
+            const gy = Math.random() * 2048;
+            const shade = Math.random();
+            if (shade > 0.6) {
+                rctx.fillStyle = 'rgba(40, 48, 64, 0.35)'; // lighter mineral speckle
+            } else if (shade > 0.3) {
+                rctx.fillStyle = 'rgba(7, 8, 12, 0.55)'; // dark tar binder
+            } else {
+                rctx.fillStyle = 'rgba(65, 78, 102, 0.25)'; // specular pebble
+            }
+            rctx.fillRect(gx, gy, 2 + Math.random() * 2, 2 + Math.random() * 2);
+        }
 
-        // Subtle racing lane guides
-        rctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        rctx.fillRect(140, 0, 2, 1024);
-        rctx.fillRect(370, 0, 2, 1024);
+        // Dual rubberized racing line tire wear grooves (subtle dark rubber grooving)
+        const leftTrackGrad = rctx.createLinearGradient(280, 0, 410, 0);
+        leftTrackGrad.addColorStop(0, 'rgba(6, 7, 10, 0)');
+        leftTrackGrad.addColorStop(0.5, 'rgba(5, 6, 9, 0.65)');
+        leftTrackGrad.addColorStop(1, 'rgba(6, 7, 10, 0)');
+        rctx.fillStyle = leftTrackGrad;
+        rctx.fillRect(280, 0, 130, 2048);
 
-        // Dashed bright white center line
+        const rightTrackGrad = rctx.createLinearGradient(614, 0, 744, 0);
+        rightTrackGrad.addColorStop(0, 'rgba(6, 7, 10, 0)');
+        rightTrackGrad.addColorStop(0.5, 'rgba(5, 6, 9, 0.65)');
+        rightTrackGrad.addColorStop(1, 'rgba(6, 7, 10, 0)');
+        rctx.fillStyle = rightTrackGrad;
+        rctx.fillRect(614, 0, 130, 2048);
+
+        // Outer white edge boundary lines with glowing cyan pinstripe
+        rctx.fillStyle = 'rgba(0, 240, 255, 0.45)';
+        rctx.fillRect(40, 0, 4, 2048);   // left cyan pinstripe
+        rctx.fillRect(980, 0, 4, 2048);  // right cyan pinstripe
+
         rctx.fillStyle = '#ffffff';
-        const dashLen = 48;
-        const gapLen = 48;
-        for (let y = 0; y < 1024; y += dashLen + gapLen) {
-            rctx.fillRect(252, y, 8, dashLen);
+        rctx.fillRect(48, 0, 14, 2048);  // left edge main line
+        rctx.fillRect(962, 0, 14, 2048); // right edge main line
+
+        // Subtle inner lane guides
+        rctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        rctx.fillRect(270, 0, 3, 2048);
+        rctx.fillRect(751, 0, 3, 2048);
+
+        // Center dashed line with subtle neon glow halo
+        const dashLen = 96;
+        const gapLen = 96;
+        for (let y = 0; y < 2048; y += dashLen + gapLen) {
+            // Cyan soft halo
+            rctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+            rctx.fillRect(502, y - 4, 20, dashLen + 8);
+            // Crisp bright white core
+            rctx.fillStyle = '#ffffff';
+            rctx.fillRect(506, y, 12, dashLen);
+        }
+
+        // Retroreflective road stud markers ("cat's eyes") every 128px along boundaries
+        for (let y = 32; y < 2048; y += 128) {
+            // Left stud (amber glow)
+            const studGradL = rctx.createRadialGradient(38, y, 1, 38, y, 8);
+            studGradL.addColorStop(0, '#ffffff');
+            studGradL.addColorStop(0.4, '#ffaa00');
+            studGradL.addColorStop(1, 'rgba(255, 170, 0, 0)');
+            rctx.fillStyle = studGradL;
+            rctx.beginPath();
+            rctx.arc(38, y, 8, 0, Math.PI * 2);
+            rctx.fill();
+
+            // Right stud (cyan glow)
+            const studGradR = rctx.createRadialGradient(986, y, 1, 986, y, 8);
+            studGradR.addColorStop(0, '#ffffff');
+            studGradR.addColorStop(0.4, '#00f0ff');
+            studGradR.addColorStop(1, 'rgba(0, 240, 255, 0)');
+            rctx.fillStyle = studGradR;
+            rctx.beginPath();
+            rctx.arc(986, y, 8, 0, Math.PI * 2);
+            rctx.fill();
+        }
+
+        // Apex guidance chevrons periodically along track center
+        for (let y = 256; y < 2048; y += 512) {
+            rctx.save();
+            rctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            rctx.lineWidth = 4;
+            rctx.lineJoin = 'miter';
+            rctx.beginPath();
+            rctx.moveTo(492, y + 24);
+            rctx.lineTo(512, y);
+            rctx.lineTo(532, y + 24);
+            rctx.stroke();
+            rctx.restore();
         }
 
         const roadTexture = new THREE.CanvasTexture(roadTexCanvas);
         roadTexture.wrapS = THREE.RepeatWrapping;
         roadTexture.wrapT = THREE.RepeatWrapping;
         roadTexture.repeat.set(1, 1);
+        roadTexture.anisotropy = 16;
 
-        // Road Material (High visibility asphalt)
+        // Road Material (Wet asphalt with specular highlights)
         roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
         roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(roadUvs, 2));
         roadGeo.setIndex(roadIndices);
@@ -266,14 +348,14 @@ export class ProceduralTrack {
 
         const roadMat = new THREE.MeshStandardMaterial({
             map: roadTexture,
-            roughness: 0.82,
-            metalness: 0.1
+            roughness: 0.36,
+            metalness: 0.28
         });
         this.roadMesh = new THREE.Mesh(roadGeo, roadMat);
         this.roadMesh.receiveShadow = true;
         root.add(this.roadMesh);
 
-        // Kerbs
+        // Kerbs (Wet gloss curbs)
         const kerbGeo = new THREE.BufferGeometry();
         kerbGeo.setAttribute('position', new THREE.Float32BufferAttribute(kerbPositions, 3));
         kerbGeo.setAttribute('color', new THREE.Float32BufferAttribute(kerbColors, 3));
@@ -281,8 +363,8 @@ export class ProceduralTrack {
         kerbGeo.computeVertexNormals();
         const kerbMat = new THREE.MeshStandardMaterial({
             vertexColors: true,
-            roughness: 0.35,
-            metalness: 0.2
+            roughness: 0.26,
+            metalness: 0.25
         });
         this.kerbMesh = new THREE.Mesh(kerbGeo, kerbMat);
         root.add(this.kerbMesh);
@@ -295,10 +377,10 @@ export class ProceduralTrack {
         barrierGeo.computeVertexNormals();
         const barrierMat = new THREE.MeshStandardMaterial({
             vertexColors: true,
-            roughness: 0.15,
-            metalness: 0.9,
+            roughness: 0.12,
+            metalness: 0.95,
             emissive: 0x004466,
-            emissiveIntensity: 0.85,
+            emissiveIntensity: 1.4,
             side: THREE.DoubleSide
         });
         this.barrierMesh = new THREE.Mesh(barrierGeo, barrierMat);

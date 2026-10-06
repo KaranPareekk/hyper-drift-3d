@@ -6,8 +6,8 @@ export class GameRenderer {
 
         // Scene & Atmosphere (High visibility twilight)
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x0c1426);
-        this.scene.fog = new THREE.FogExp2(0x0c1426, 0.0009);
+        this.scene.background = new THREE.Color(0x061124);
+        this.scene.fog = new THREE.FogExp2(0x09152a, 0.00075);
 
         // Cinematic Follow Camera
         const aspect = window.innerWidth / window.innerHeight;
@@ -23,8 +23,11 @@ export class GameRenderer {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.15;
+        this.renderer.toneMappingExposure = 1.22;
         this.container.appendChild(this.renderer.domElement);
+
+        // Atmosphere & Sky Dome
+        this.setupAtmosphere();
 
         // Lights
         this.setupLights();
@@ -48,6 +51,131 @@ export class GameRenderer {
 
         // Window resize
         window.addEventListener('resize', () => this.onResize());
+    }
+
+    setupAtmosphere() {
+        this.skyGroup = new THREE.Group();
+        this.skyGroup.name = "celestialAtmosphere";
+
+        // 1. Inverted celestial sphere dome with smooth night twilight gradient
+        const skyGeo = new THREE.SphereGeometry(1800, 32, 24);
+        const skyCanvas = document.createElement('canvas');
+        skyCanvas.width = 512;
+        skyCanvas.height = 1024;
+        const sctx = skyCanvas.getContext('2d');
+
+        const grad = sctx.createLinearGradient(0, 0, 0, 1024);
+        grad.addColorStop(0.00, '#020108'); // Cosmic deep zenith
+        grad.addColorStop(0.32, '#090518'); // Deep synthwave purple
+        grad.addColorStop(0.58, '#140c2e'); // Neon twilight atmospheric shelf
+        grad.addColorStop(0.78, '#172244'); // Horizon indigo haze
+        grad.addColorStop(0.91, '#093256'); // Luminous cyan horizon glow
+        grad.addColorStop(0.97, '#081729'); // Ground level atmospheric rim
+        grad.addColorStop(1.00, '#050c18'); // Sub-surface nadir
+        sctx.fillStyle = grad;
+        sctx.fillRect(0, 0, 512, 1024);
+
+        const skyTexture = new THREE.CanvasTexture(skyCanvas);
+        const skyMat = new THREE.MeshBasicMaterial({
+            map: skyTexture,
+            side: THREE.BackSide,
+            depthWrite: false
+        });
+        const skyDome = new THREE.Mesh(skyGeo, skyMat);
+        this.skyGroup.add(skyDome);
+
+        // 2. Cosmic Starfield Particles in upper atmosphere
+        const starCount = 1200;
+        const starGeo = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount; i++) {
+            const u = Math.random();
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(1 - u * 0.88); // Concentrate towards upper sky
+            const r = 1750;
+
+            const x = r * Math.sin(phi) * Math.cos(theta);
+            const y = Math.max(140, r * Math.cos(phi));
+            const z = r * Math.sin(phi) * Math.sin(theta);
+
+            starPositions[i * 3] = x;
+            starPositions[i * 3 + 1] = y;
+            starPositions[i * 3 + 2] = z;
+
+            // Star tint: crisp white, diamond cyan, warm gold, cosmic magenta
+            const colorChoice = Math.random();
+            if (colorChoice > 0.8) {
+                starColors[i * 3] = 0.45; starColors[i * 3 + 1] = 0.95; starColors[i * 3 + 2] = 1.0; // Cyan
+            } else if (colorChoice > 0.65) {
+                starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 0.88; starColors[i * 3 + 2] = 0.6; // Gold
+            } else if (colorChoice > 0.5) {
+                starColors[i * 3] = 0.95; starColors[i * 3 + 1] = 0.55; starColors[i * 3 + 2] = 1.0; // Violet
+            } else {
+                starColors[i * 3] = 0.95; starColors[i * 3 + 1] = 0.98; starColors[i * 3 + 2] = 1.0; // White
+            }
+        }
+
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+        const starMat = new THREE.PointsMaterial({
+            size: 2.8,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.90,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const starfield = new THREE.Points(starGeo, starMat);
+        this.skyGroup.add(starfield);
+
+        // 3. Cyber Moon / Giant Synthwave Celestial Orb
+        const moonGroup = new THREE.Group();
+        moonGroup.position.set(480, 260, -1200);
+
+        // Outer radial halo glow
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = 256;
+        glowCanvas.height = 256;
+        const gctx = glowCanvas.getContext('2d');
+        const radGrad = gctx.createRadialGradient(128, 128, 15, 128, 128, 128);
+        radGrad.addColorStop(0.0, 'rgba(0, 240, 255, 0.95)');
+        radGrad.addColorStop(0.25, 'rgba(60, 140, 255, 0.65)');
+        radGrad.addColorStop(0.55, 'rgba(180, 50, 255, 0.30)');
+        radGrad.addColorStop(0.85, 'rgba(255, 0, 128, 0.10)');
+        radGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+        gctx.fillStyle = radGrad;
+        gctx.fillRect(0, 0, 256, 256);
+
+        const haloTexture = new THREE.CanvasTexture(glowCanvas);
+        const haloMat = new THREE.MeshBasicMaterial({
+            map: haloTexture,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), haloMat);
+        moonGroup.add(haloMesh);
+
+        // Inner glowing core disc
+        const moonDiscMat = new THREE.MeshBasicMaterial({
+            color: 0xd6f7ff,
+            transparent: true,
+            opacity: 0.95,
+            depthWrite: false
+        });
+        const moonDisc = new THREE.Mesh(new THREE.CircleGeometry(75, 32), moonDiscMat);
+        moonDisc.position.z = 1;
+        moonGroup.add(moonDisc);
+
+        moonGroup.lookAt(0, 50, 0);
+        this.skyGroup.add(moonGroup);
+
+        this.scene.add(this.skyGroup);
     }
 
     setupLights() {
@@ -352,6 +480,12 @@ export class GameRenderer {
         this.dirLight.position.x = carRoot.position.x + 100;
         this.dirLight.position.z = carRoot.position.z + 100;
         this.dirLight.target = carRoot;
+
+        // Keep atmospheric sky dome centered around camera
+        if (this.skyGroup) {
+            this.skyGroup.position.x = this.camera.position.x;
+            this.skyGroup.position.z = this.camera.position.z;
+        }
 
         // Skidmarks & Tire Smoke
         if (targetPhysics.isDrifting && targetPhysics.wheels && speedKmh > 35) {

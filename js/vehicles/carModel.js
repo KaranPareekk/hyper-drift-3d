@@ -71,11 +71,11 @@ export class CarModelBuilder {
 
         const paintMaterial = new THREE.MeshPhysicalMaterial({
             color: colorHex,
-            metalness: 0.88,
-            roughness: 0.16,
+            metalness: 0.92,
+            roughness: 0.12,
             clearcoat: 1.0,
-            clearcoatRoughness: 0.06,
-            reflectivity: 0.92
+            clearcoatRoughness: 0.03,
+            reflectivity: 0.96
         });
 
         let wheelsData = null;
@@ -104,18 +104,55 @@ export class CarModelBuilder {
         chassis.add(rightHeadlight);
         chassis.add(rightHeadlight.target);
 
-        // Dynamic underglow neon
+        // Volumetric forward headlight beams (god-ray glow cones)
+        const beamGeo = new THREE.CylinderGeometry(0.12, 1.6, 28, 16, 1, true);
+        const beamMatL = new THREE.MeshBasicMaterial({
+            color: 0xd6f2ff,
+            transparent: true,
+            opacity: 0.13,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const leftBeam = new THREE.Mesh(beamGeo, beamMatL);
+        leftBeam.rotation.x = Math.PI / 2 + 0.03;
+        leftBeam.position.set(-0.65, 0.42, -15.5);
+        chassis.add(leftBeam);
+
+        const beamMatR = beamMatL.clone();
+        const rightBeam = new THREE.Mesh(beamGeo, beamMatR);
+        rightBeam.rotation.x = Math.PI / 2 + 0.03;
+        rightBeam.position.set(0.65, 0.42, -15.5);
+        chassis.add(rightBeam);
+        animatedParts.headlightBeams = [leftBeam, rightBeam];
+
+        // Dynamic soft radial underglow neon
         const underglowColor = (type === 'apex') ? 0x00f0ff : 0xff0055;
-        const underglowLight = new THREE.PointLight(underglowColor, 2.8, 4.5);
-        underglowLight.position.set(0, 0.18, 0);
+        const underglowLight = new THREE.PointLight(underglowColor, 3.2, 5.2);
+        underglowLight.position.set(0, 0.22, 0);
         chassis.add(underglowLight);
 
-        // Ground underglow glow pool
-        const underglowGeo = new THREE.PlaneGeometry(2.3, 4.8);
+        // Ground soft exponential glow texture
+        const ugCanvas = document.createElement('canvas');
+        ugCanvas.width = 256;
+        ugCanvas.height = 256;
+        const ugCtx = ugCanvas.getContext('2d');
+        const ugGrad = ugCtx.createRadialGradient(128, 128, 15, 128, 128, 128);
+        const ugRgb = (type === 'apex') ? '0, 240, 255' : '255, 0, 85';
+        ugGrad.addColorStop(0.00, `rgba(${ugRgb}, 0.85)`);
+        ugGrad.addColorStop(0.35, `rgba(${ugRgb}, 0.50)`);
+        ugGrad.addColorStop(0.70, `rgba(${ugRgb}, 0.18)`);
+        ugGrad.addColorStop(1.00, `rgba(${ugRgb}, 0)`);
+        ugCtx.fillStyle = ugGrad;
+        ugCtx.fillRect(0, 0, 256, 256);
+
+        const ugTexture = new THREE.CanvasTexture(ugCanvas);
+        const underglowGeo = new THREE.PlaneGeometry(3.2, 5.8);
         const underglowMat = new THREE.MeshBasicMaterial({
-            color: underglowColor,
+            map: ugTexture,
             transparent: true,
-            opacity: 0.42,
+            opacity: 0.70,
+            blending: THREE.AdditiveBlending,
             depthWrite: false
         });
         const underglowMesh = new THREE.Mesh(underglowGeo, underglowMat);
